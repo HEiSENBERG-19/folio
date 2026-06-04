@@ -52,3 +52,46 @@ class TransactionCreate(BaseModel):
             self.price_per_unit = 0.0
             self.asset_id = None
         return self
+
+
+class HoldingDetail(BaseModel):
+    ticker: str
+    asset_name: str
+    total_shares: float
+    avg_cost_basis: float
+    current_price: float
+    market_value: float
+    unrealized_pnl: float
+    unrealized_pnl_pct: float
+    realized_pnl: float
+
+
+class PortfolioSummary(BaseModel):
+    total_invested: float
+    total_market_value: float
+    total_cash: float
+    total_realized_pnl: float
+    total_unrealized_pnl: float
+    net_portfolio_value: float
+    holdings: list[HoldingDetail]
+
+
+from datetime import date
+
+class PortfolioHistoryPoint(BaseModel):
+    date: date
+    portfolio_value: float
+    cash_balance: float
+    total_value: float
+
+
+class PortfolioHistory(BaseModel):
+    period: str
+    data_points: list[PortfolioHistoryPoint]
+
+
+class AllocationSlice(BaseModel):
+    ticker: str
+    market_value: float
+    percentage: float
+
