@@ -1,0 +1,36 @@
+# SQLite Database
+*.db
+backend/app/folio.db
+backend/folio.db
+
+# Python virtual environment
+.venv/
+venv/
+ENV/
+env/
+
+# Python cache / compile
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+
+# Frontend dependencies and builds
+node_modules/
+dist/
+dist-ssr/
+*.local
+
+# Editor / OS files
+.DS_Store
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
