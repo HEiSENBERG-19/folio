@@ -3,7 +3,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.database import create_db_and_tables
-from app.routers import accounts, assets
+from app.routers import accounts, assets, transactions
 from app.config import settings
 
 
@@ -25,6 +25,7 @@ app.add_middleware(
 
 app.include_router(accounts.router, prefix=settings.API_V1_PREFIX)
 app.include_router(assets.router, prefix=settings.API_V1_PREFIX)
+app.include_router(transactions.router, prefix=settings.API_V1_PREFIX)
 
 
 @app.get("/")
