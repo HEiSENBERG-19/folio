@@ -30,7 +30,7 @@
 
 ## Current Status
 - [x] M1: Backend Setup & Database Layer
-- [ ] M2: FIFO Engine & Transaction Processing
+- [x] M2: FIFO Engine & Transaction Processing
 - [ ] M3: yfinance Integration & Portfolio API
 - [ ] M4: Frontend UI Shell & Layout
 - [ ] M5: TanStack Query & Charts
