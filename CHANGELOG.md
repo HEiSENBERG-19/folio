@@ -7,7 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v0.3.0] — 2026-06-04
+
+### Added
+- Historical price fetching from yfinance with a persistent local SQLite `PriceCache`
+- Price matrix generator utilizing Pandas to reindex calendar dates and forward-fill market closed gaps
+- Portfolio summary aggregates, calculating weighted average cost basis, market values, and unrealized and realized P&L
+- Historical snapshot walking of transaction ledgers to build daily portfolio values (holdings value + cash balance)
+- Asset allocation percentage endpoints
+- `/portfolio/summary`, `/portfolio/history`, and `/portfolio/allocation` API endpoints
+- Comprehensive test coverage for pricing service, cache validations, fill logic, and portfolio endpoints
+
 ## [v0.2.0] — 2026-06-04
+
 
 ### Added
 - FIFO matching engine service `fifo_engine.py` with `process_sell`, `process_transaction`, and `replay_ledger`
