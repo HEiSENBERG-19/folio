@@ -29,7 +29,7 @@
 - `float` for monetary values (acceptable for single-user scope)
 
 ## Current Status
-- [ ] M1: Backend Setup & Database Layer
+- [x] M1: Backend Setup & Database Layer
 - [ ] M2: FIFO Engine & Transaction Processing
 - [ ] M3: yfinance Integration & Portfolio API
 - [ ] M4: Frontend UI Shell & Layout
