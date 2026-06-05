@@ -2,8 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session
 
 from app.database import get_session
-from app.schemas import PortfolioSummary, PortfolioHistory, AllocationSlice
-from app.services.portfolio import get_portfolio_summary, get_portfolio_history, get_portfolio_allocation
+from app.schemas import PortfolioSummary, PortfolioHistory, AllocationSlice, PortfolioInsights
+from app.services.portfolio import get_portfolio_summary, get_portfolio_history, get_portfolio_allocation, get_portfolio_insights
 
 router = APIRouter(prefix="/portfolio", tags=["portfolio"])
 
@@ -26,3 +26,8 @@ def read_portfolio_history(
 @router.get("/allocation", response_model=list[AllocationSlice])
 def read_portfolio_allocation(session: Session = Depends(get_session)):
     return get_portfolio_allocation(session)
+
+
+@router.get("/insights", response_model=PortfolioInsights)
+def read_portfolio_insights(session: Session = Depends(get_session)):
+    return get_portfolio_insights(session)

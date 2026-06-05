@@ -391,3 +391,120 @@ def test_api_portfolio_history(mock_build_matrix, client):
     # Test invalid period
     invalid_resp = client.get("/api/v1/portfolio/history?period=INVALID")
     assert invalid_resp.status_code == 400
+
+
+@patch("yfinance.Ticker")
+def test_get_usd_inr_rate(mock_ticker):
+    mock_instance = MagicMock()
+    mock_instance.fast_info.get.return_value = 84.2
+    mock_ticker.return_value = mock_instance
+    
+    from app.services.portfolio import get_usd_inr_rate
+    rate = get_usd_inr_rate()
+    assert rate == 84.2
+
+    # Offline/fallback case
+    mock_instance.fast_info.get.side_effect = Exception("offline")
+    mock_instance.history.return_value = MagicMock(empty=True)
+    rate = get_usd_inr_rate()
+    assert rate == 83.5
+
+
+@patch("yfinance.Ticker")
+def test_fetch_and_cache_metadata(mock_ticker, session: Session):
+    _, asset = create_base_entities(session)
+    
+    mock_instance = MagicMock()
+    mock_instance.info = {
+        "quoteType": "EQUITY",
+        "currency": "USD",
+        "longName": "Apple Inc.",
+        "sector": "Technology",
+        "industry": "Consumer Electronics",
+        "country": "United States",
+        "exchange": "NMS",
+        "beta": 1.2,
+        "marketCap": 2500000000000,
+        "fiftyTwoWeekHigh": 180.0,
+        "fiftyTwoWeekLow": 130.0,
+        "trailingPE": 28.5,
+        "dividendYield": 0.005,
+        "priceToBook": 40.0,
+    }
+    mock_ticker.return_value = mock_instance
+
+    from app.services.portfolio import fetch_and_cache_metadata
+    meta = fetch_and_cache_metadata(session, asset)
+    assert meta.asset_id == asset.id
+    assert meta.currency == "USD"
+    assert meta.sector == "Technology"
+    assert meta.beta == 1.2
+    
+    # Check that it's stored in db
+    from app.models import AssetMetadata
+    db_meta = session.exec(select(AssetMetadata).where(AssetMetadata.asset_id == asset.id)).first()
+    assert db_meta is not None
+    assert db_meta.sector == "Technology"
+
+
+@patch("app.services.portfolio.get_usd_inr_rate")
+@patch("app.services.portfolio.fetch_and_cache_metadata")
+@patch("app.services.price_service.get_current_prices")
+def test_api_portfolio_insights(mock_get_current_prices, mock_fetch_meta, mock_get_rate, client, session: Session):
+    # Setup account and asset
+    acc_resp = client.post("/api/v1/accounts", json={"name": "Insights Account", "currency": "INR"})
+    account_id = acc_resp.json()["id"]
+
+    asset_resp = client.post("/api/v1/assets", json={"ticker": "AAPL", "name": "Apple Inc."})
+    asset_id = asset_resp.json()["id"]
+
+    # Deposit INR cash
+    client.post("/api/v1/transactions", json={
+        "account_id": account_id,
+        "tx_type": "DEPOSIT",
+        "total_amount": 100000.0,
+        "executed_at": "2026-06-01T10:00:00Z"
+    })
+
+    # Buy AAPL
+    client.post("/api/v1/transactions", json={
+        "account_id": account_id,
+        "asset_id": asset_id,
+        "tx_type": "BUY",
+        "quantity": 5.0,
+        "price_per_unit": 12000.0,
+        "executed_at": "2026-06-02T10:00:00Z"
+    })
+
+    mock_get_rate.return_value = 80.0
+    mock_get_current_prices.return_value = {"AAPL": 13000.0}
+    
+    from app.models import AssetMetadata
+    mock_meta = AssetMetadata(
+        asset_id=asset_id,
+        currency="INR",
+        asset_class="Equity",
+        sector="Technology",
+        country="India",
+        beta=1.1,
+        fifty_two_week_high=15000.0,
+        fifty_two_week_low=10000.0,
+        unrealized_pnl_native=5000.0
+    )
+    mock_fetch_meta.return_value = mock_meta
+
+    resp = client.get("/api/v1/portfolio/insights")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["usd_inr_rate"] == 80.0
+    assert len(data["holdings"]) == 1
+    assert data["holdings"][0]["ticker"] == "AAPL"
+    assert data["holdings"][0]["currency"] == "INR"
+    assert data["holdings"][0]["sector"] == "Technology"
+    assert data["holdings"][0]["beta"] == 1.1
+
+    assert len(data["cash_balances"]) == 1
+    assert data["cash_balances"][0]["account_name"] == "Insights Account"
+    assert data["cash_balances"][0]["currency"] == "INR"
+    assert data["cash_balances"][0]["cash_balance_native"] == 40000.0
+
