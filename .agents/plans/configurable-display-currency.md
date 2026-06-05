@@ -1,6 +1,6 @@
 ---
 name: Configurable Display Currency
-status: Approved
+status: Completed
 priority: high
 created: 2026-06-05
 updated: 2026-06-05
@@ -11,7 +11,7 @@ progress:
   - "[x] Task 4: Integrate currency hook in Holdings.tsx"
   - "[x] Task 5: Integrate currency hook in Transactions.tsx"
   - "[x] Task 6: Add currency toggle UI in Sidebar.tsx"
-  - "[ ] Task 7: E2E Manual testing and verification"
+  - "[x] Task 7: E2E Manual testing and verification"
 ---
 
 # Feature: Configurable Display Currency
