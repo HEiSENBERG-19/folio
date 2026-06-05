@@ -18,7 +18,7 @@ export const CurrencyProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     if (saved === 'USD' || saved === 'INR') {
       return saved;
     }
-    return 'USD';
+    return 'INR';
   });
 
   const setCurrency = (curr: Currency) => {
