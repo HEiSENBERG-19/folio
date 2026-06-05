@@ -78,7 +78,7 @@ Create custom hooks file structure:
 Verify milestone execution:
 1. Start both servers:
    - Backend: `cd backend && uvicorn app.main:app` (on port 8000).
-   - Frontend: `cd frontend && npm run dev` (on port 5173).
+   - Frontend: `cd frontend && npm run dev` (on port 5174).
 2. Create an account and asset via the UI.
 3. Test Deposit transaction -> Cash card on Dashboard immediately updates.
 4. Test Buy transaction -> Portfolio value chart starts rendering, holdings show new row.

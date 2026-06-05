@@ -115,7 +115,7 @@ class PriceCache(SQLModel, table=True):
 ### 1.3 — FastAPI App Factory
 - **`backend/app/main.py`**:
   - Initialize the FastAPI app named "Folio API".
-  - Configure CORS middleware to permit origin `http://localhost:5173` (Vite frontend dev server).
+  - Configure CORS middleware to permit origin `http://localhost:5174` (Vite frontend dev server).
   - Use `lifespan` handler to trigger `create_db_and_tables()` on startup.
   - Mount routing handlers for accounts and assets under `/api/v1`.
   - Add simple root GET `/` healthcheck endpoint returning `{"status": "ok"}`.

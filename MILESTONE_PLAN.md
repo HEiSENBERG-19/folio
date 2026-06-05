@@ -45,7 +45,7 @@
 
 - [ ] **`app/main.py`**:
   - Create `FastAPI` app with title "Folio API".
-  - Add CORS middleware (allow `http://localhost:5173` for Vite dev server).
+  - Add CORS middleware (allow `http://localhost:5174` for Vite dev server).
   - Add `lifespan` context manager that calls `create_db_and_tables()` on startup.
   - Include routers (empty stubs for now).
   - Add a root healthcheck: `GET /` → `{"status": "ok"}`.
@@ -348,7 +348,7 @@ cd backend && pytest tests/ -v
 cd frontend && npm run dev
 ```
 
-- [ ] App loads at `http://localhost:5173` without errors.
+- [ ] App loads at `http://localhost:5174` without errors.
 - [ ] Sidebar navigation works — clicking links routes correctly with no full page reload.
 - [ ] All 3 pages render their placeholder content.
 - [ ] Dark mode styling is applied, fonts load, layout is responsive.
