@@ -1,46 +1,123 @@
+import { useState } from 'react';
 import { TrendingUp, Wallet, DollarSign, ArrowUpRight, Briefcase } from 'lucide-react';
+import { usePortfolioSummary, usePortfolioHistory, usePortfolioAllocation } from '../hooks/usePortfolio';
+import {
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  Legend,
+} from 'recharts';
 
+const COLORS = ['#10b981', '#06b6d4', '#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b'];
+
+const formatCurrency = (val: number) => {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+  }).format(val);
+};
+
+const formatPercent = (val: number) => {
+  const sign = val >= 0 ? '+' : '';
+  return `${sign}${val.toFixed(2)}%`;
+};
 
 export default function Dashboard() {
+  const [period, setPeriod] = useState<string>('1Y');
+
+  const { data: summary, isLoading: summaryLoading } = usePortfolioSummary();
+  const { data: history, isLoading: historyLoading } = usePortfolioHistory(period);
+  const { data: allocation, isLoading: allocationLoading } = usePortfolioAllocation();
+
+  const unrealizedPnlPct = summary?.total_invested
+    ? (summary.total_unrealized_pnl / summary.total_invested) * 100
+    : 0;
+
   const stats = [
     {
       label: 'Net Portfolio Value',
-      value: '$11,190.15',
-      change: '+10.2%',
-      isPositive: true,
+      value: summary ? formatCurrency(summary.net_portfolio_value) : '$0.00',
+      change: null,
       icon: Wallet,
       colorClass: 'text-emerald-400 bg-emerald-500/10',
     },
     {
       label: 'Invested Capital',
-      value: '$2,900.00',
+      value: summary ? formatCurrency(summary.total_invested) : '$0.00',
       change: null,
       icon: DollarSign,
       colorClass: 'text-blue-400 bg-blue-500/10',
     },
     {
       label: 'Unrealized P&L',
-      value: '+$1,110.15',
-      change: '+38.28%',
-      isPositive: true,
+      value: summary ? `${summary.total_unrealized_pnl >= 0 ? '+' : ''}${formatCurrency(summary.total_unrealized_pnl)}` : '$0.00',
+      change: summary ? formatPercent(unrealizedPnlPct) : null,
+      isPositive: summary ? summary.total_unrealized_pnl >= 0 : true,
       icon: ArrowUpRight,
-      colorClass: 'text-emerald-400 bg-emerald-500/10',
+      colorClass: summary && summary.total_unrealized_pnl >= 0 ? 'text-emerald-400 bg-emerald-500/10' : 'text-red-400 bg-red-500/10',
     },
     {
       label: 'Realized P&L',
-      value: '+$80.00',
+      value: summary ? `${summary.total_realized_pnl >= 0 ? '+' : ''}${formatCurrency(summary.total_realized_pnl)}` : '$0.00',
       change: null,
       icon: TrendingUp,
-      colorClass: 'text-teal-400 bg-teal-500/10',
+      colorClass: summary && summary.total_realized_pnl >= 0 ? 'text-teal-400 bg-teal-500/10' : 'text-red-400 bg-red-500/10',
     },
     {
       label: 'Cash Balance',
-      value: '$7,180.00',
+      value: summary ? formatCurrency(summary.total_cash) : '$0.00',
       change: null,
       icon: Briefcase,
       colorClass: 'text-purple-400 bg-purple-500/10',
     },
   ];
+
+  // Custom tooltips
+  const CustomHistoryTooltip = ({ active, payload, label }: any) => {
+    if (active && payload && payload.length) {
+      const data = payload[0].payload;
+      return (
+        <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl shadow-lg backdrop-blur-md">
+          <p className="text-xs font-semibold text-slate-400">{label}</p>
+          <p className="text-sm font-bold text-emerald-400 mt-1">
+            Total: {formatCurrency(data.total_value)}
+          </p>
+          <p className="text-xs text-slate-300 mt-0.5">
+            Stock: {formatCurrency(data.portfolio_value)}
+          </p>
+          <p className="text-xs text-slate-300">
+            Cash: {formatCurrency(data.cash_balance)}
+          </p>
+        </div>
+      );
+    }
+    return null;
+  };
+
+  const CustomAllocationTooltip = ({ active, payload }: any) => {
+    if (active && payload && payload.length) {
+      const data = payload[0].payload;
+      return (
+        <div className="bg-slate-900 border border-slate-800 p-3 rounded-xl shadow-lg backdrop-blur-md">
+          <p className="text-sm font-bold text-white">{data.ticker}</p>
+          <p className="text-xs text-slate-300 mt-1">
+            Market Value: {formatCurrency(data.market_value)}
+          </p>
+          <p className="text-xs font-semibold text-emerald-400">
+            Percentage: {data.percentage.toFixed(2)}%
+          </p>
+        </div>
+      );
+    }
+    return null;
+  };
 
   return (
     <div className="space-y-8">
@@ -51,39 +128,54 @@ export default function Dashboard() {
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-5">
-        {stats.map((stat) => {
-          const Icon = stat.icon;
-          return (
-            <div
-              key={stat.label}
-              className="relative overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/40 p-5 shadow-sm backdrop-blur-md transition-all duration-200 hover:border-slate-700"
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">{stat.label}</span>
-                <div className={`p-2 rounded-xl ${stat.colorClass}`}>
-                  <Icon className="h-5 w-5" />
+        {summaryLoading
+          ? Array.from({ length: 5 }).map((_, i) => (
+              <div
+                key={i}
+                className="relative overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/40 p-5 shadow-sm backdrop-blur-md"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="h-4 w-24 bg-slate-800 rounded animate-pulse" />
+                  <div className="h-9 w-9 bg-slate-800 rounded-xl animate-pulse" />
+                </div>
+                <div className="mt-4 flex items-baseline gap-2">
+                  <div className="h-8 w-28 bg-slate-800 rounded animate-pulse" />
                 </div>
               </div>
-              <div className="mt-4 flex items-baseline gap-2">
-                <span className="text-2xl font-bold text-white tracking-tight">{stat.value}</span>
-                {stat.change && (
-                  <span
-                    className={`inline-flex items-center text-xs font-semibold ${
-                      stat.isPositive ? 'text-emerald-400' : 'text-red-400'
-                    }`}
-                  >
-                    {stat.change}
-                  </span>
-                )}
-              </div>
-            </div>
-          );
-        })}
+            ))
+          : stats.map((stat) => {
+              const Icon = stat.icon;
+              return (
+                <div
+                  key={stat.label}
+                  className="relative overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/40 p-5 shadow-sm backdrop-blur-md transition-all duration-200 hover:border-slate-700"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">{stat.label}</span>
+                    <div className={`p-2 rounded-xl ${stat.colorClass}`}>
+                      <Icon className="h-5 w-5" />
+                    </div>
+                  </div>
+                  <div className="mt-4 flex items-baseline gap-2">
+                    <span className="text-2xl font-bold text-white tracking-tight">{stat.value}</span>
+                    {stat.change && (
+                      <span
+                        className={`inline-flex items-center text-xs font-semibold ${
+                          stat.isPositive ? 'text-emerald-400' : 'text-red-400'
+                        }`}
+                      >
+                        {stat.change}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
       </div>
 
-      {/* Chart Placeholders */}
+      {/* Charts Section */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        {/* Performance Chart Placeholder */}
+        {/* Performance Chart */}
         <div className="lg:col-span-2 rounded-2xl border border-slate-800 bg-slate-900/40 p-6 backdrop-blur-md min-h-[400px] flex flex-col justify-between">
           <div className="flex items-center justify-between">
             <div>
@@ -94,8 +186,11 @@ export default function Dashboard() {
               {['1M', '3M', '6M', '1Y', 'ALL'].map((p) => (
                 <button
                   key={p}
-                  className={`px-3 py-1 text-xs font-medium rounded-md transition-all duration-150 ${
-                    p === '1M' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'text-slate-400 hover:text-slate-200'
+                  onClick={() => setPeriod(p)}
+                  className={`px-3 py-1 text-xs font-medium rounded-md transition-all duration-150 cursor-pointer ${
+                    p === period
+                      ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                      : 'text-slate-400 hover:text-slate-200'
                   }`}
                 >
                   {p}
@@ -103,37 +198,115 @@ export default function Dashboard() {
               ))}
             </div>
           </div>
-          
-          {/* Mock Chart Area */}
-          <div className="flex-1 flex items-center justify-center border-2 border-dashed border-slate-800/80 rounded-xl my-6 bg-slate-950/40 relative overflow-hidden group">
-            <div className="absolute inset-0 bg-gradient-to-t from-emerald-500/5 to-transparent"></div>
-            <div className="text-center z-10">
-              <TrendingUp className="h-10 w-10 text-emerald-500/40 mx-auto mb-2 group-hover:scale-110 transition-transform duration-200" />
-              <p className="text-sm font-semibold text-slate-300">Historical performance chart will render here</p>
-              <p className="text-xs text-slate-500 mt-1">TanStack Query + Recharts integration in next milestone</p>
+
+          {historyLoading ? (
+            <div className="flex-1 flex items-center justify-center border border-dashed border-slate-800/80 rounded-xl my-6 bg-slate-950/40 relative overflow-hidden group">
+              <div className="text-center z-10 animate-pulse">
+                <TrendingUp className="h-10 w-10 text-slate-600 mx-auto mb-2" />
+                <p className="text-sm font-semibold text-slate-500">Loading performance data...</p>
+              </div>
             </div>
-          </div>
+          ) : !history || !history.data_points || history.data_points.length === 0 ? (
+            <div className="flex-1 flex items-center justify-center border border-dashed border-slate-800/80 rounded-xl my-6 bg-slate-950/40 relative overflow-hidden group">
+              <div className="absolute inset-0 bg-gradient-to-t from-emerald-500/5 to-transparent"></div>
+              <div className="text-center z-10 p-6">
+                <TrendingUp className="h-10 w-10 text-emerald-500/40 mx-auto mb-2" />
+                <p className="text-sm font-semibold text-slate-300">No historical performance data</p>
+                <p className="text-xs text-slate-500 mt-1">Add transactions to start tracking performance over time.</p>
+              </div>
+            </div>
+          ) : (
+            <div className="flex-1 h-64 my-6">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={history.data_points}>
+                  <defs>
+                    <linearGradient id="colorTotal" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" opacity={0.4} />
+                  <XAxis
+                    dataKey="date"
+                    stroke="#64748b"
+                    fontSize={11}
+                    tickLine={false}
+                    axisLine={false}
+                  />
+                  <YAxis
+                    stroke="#64748b"
+                    fontSize={11}
+                    tickLine={false}
+                    axisLine={false}
+                    tickFormatter={(val) => `$${val}`}
+                  />
+                  <Tooltip content={<CustomHistoryTooltip />} />
+                  <Area
+                    type="monotone"
+                    dataKey="total_value"
+                    stroke="#10b981"
+                    strokeWidth={2}
+                    fillOpacity={1}
+                    fill="url(#colorTotal)"
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          )}
         </div>
 
-        {/* Asset Allocation Placeholder */}
+        {/* Asset Allocation */}
         <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-6 backdrop-blur-md min-h-[400px] flex flex-col justify-between">
           <div>
             <h2 className="text-lg font-bold text-white">Asset Allocation</h2>
             <p className="text-xs text-slate-400">Distribution across tickers</p>
           </div>
 
-          {/* Mock Pie Chart Area */}
-          <div className="flex-1 flex items-center justify-center border-2 border-dashed border-slate-800/80 rounded-xl my-6 bg-slate-950/40 relative overflow-hidden group">
-            <div className="absolute inset-0 bg-gradient-to-tr from-teal-500/5 to-transparent"></div>
-            <div className="text-center z-10">
-              <div className="relative h-24 w-24 mx-auto mb-4 flex items-center justify-center">
-                <div className="absolute inset-0 rounded-full border-[10px] border-emerald-500/10 border-t-emerald-400 border-r-teal-400 group-hover:rotate-12 transition-transform duration-300"></div>
-                <span className="text-xs font-bold text-emerald-400">AAPL/MSFT</span>
+          {allocationLoading ? (
+            <div className="flex-1 flex items-center justify-center border border-dashed border-slate-800/80 rounded-xl my-6 bg-slate-950/40 relative overflow-hidden group">
+              <div className="text-center z-10 animate-pulse">
+                <div className="h-16 w-16 mx-auto mb-4 rounded-full border-[6px] border-slate-800 border-t-slate-600 animate-spin"></div>
+                <p className="text-sm font-semibold text-slate-500">Loading allocation...</p>
               </div>
-              <p className="text-sm font-semibold text-slate-300">Allocation breakdown</p>
-              <p className="text-xs text-slate-500 mt-1">Summary pie-chart integration pending</p>
             </div>
-          </div>
+          ) : !allocation || allocation.length === 0 ? (
+            <div className="flex-1 flex items-center justify-center border border-dashed border-slate-800/80 rounded-xl my-6 bg-slate-950/40 relative overflow-hidden group">
+              <div className="text-center z-10 p-6">
+                <Briefcase className="h-10 w-10 text-teal-500/40 mx-auto mb-2" />
+                <p className="text-sm font-semibold text-slate-300">No assets allocated</p>
+                <p className="text-xs text-slate-500 mt-1">Add stock purchases to see asset allocation.</p>
+              </div>
+            </div>
+          ) : (
+            <div className="flex-1 h-64 my-6 flex flex-col justify-center">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={allocation}
+                    dataKey="market_value"
+                    nameKey="ticker"
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={80}
+                    paddingAngle={2}
+                  >
+                    {allocation.map((_entry, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip content={<CustomAllocationTooltip />} />
+                  <Legend
+                    verticalAlign="bottom"
+                    height={36}
+                    iconType="circle"
+                    iconSize={8}
+                    formatter={(value) => <span className="text-xs font-semibold text-slate-400">{value}</span>}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          )}
         </div>
       </div>
     </div>

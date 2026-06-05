@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v0.5.0] — 2026-06-05
+
+### Added
+- Integrated TanStack Query client wrapper in main entry point
+- Created custom React query and mutation hooks for accounts, assets, transactions, and portfolio endpoints
+- Fully wired Interactive Dashboard with Recharts AreaChart (performance value history) and PieChart (asset allocation) supporting custom interactive tooltips and time period selections
+- Implemented responsive skeleton screens and empty-state placeholders on Dashboard and Holdings tables
+- Implemented functional search, type filters, and account/asset filters on the Transactions page
+- Built dynamic Add Trade modal with conditional field validation and inline creations (quick account creation and inline asset registration)
+- Implemented delete transaction triggers with confirmation alerts and real-time ledger recalculation
+- Implemented floating Toast notification banners to display detailed success and error responses
+- Computed and appended live totals row at the bottom of the Positions/Holdings table
+- Completed TypeScript compilation checks (`npm run build`) and verified all backend tests pass
+
+### Fixed
+- Fixed yfinance fetching database write crash caused by `NaN` or `Infinite` closing prices on market closed dates or holidays, which previously triggered `IntegrityError` on the `PriceCache` table and subsequent session transaction failures.
+
 ## [v0.4.0] — 2026-06-04
 
 ### Added

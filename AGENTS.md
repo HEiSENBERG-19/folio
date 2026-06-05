@@ -33,7 +33,7 @@
 - [x] M2: FIFO Engine & Transaction Processing
 - [x] M3: yfinance Integration & Portfolio API
 - [x] M4: Frontend UI Shell & Layout
-- [ ] M5: TanStack Query & Charts
+- [x] M5: TanStack Query & Charts
 - [ ] M6: End-to-End Testing & Validation
 
 ## Reference Documents

@@ -1,6 +1,7 @@
 import logging
 import yfinance as yf
 import pandas as pd
+import math
 from datetime import date, datetime, timezone, timedelta
 from sqlmodel import Session, select
 from typing import Optional
@@ -72,6 +73,8 @@ def fetch_and_cache_prices(session: Session, ticker: str, start_date: date, end_
                     d = ts.date()
                     try:
                         price = float(val)
+                        if math.isnan(price) or math.isinf(price):
+                            continue
                     except (ValueError, TypeError):
                         continue
 
@@ -93,6 +96,7 @@ def fetch_and_cache_prices(session: Session, ticker: str, start_date: date, end_
                             cached_dates.add(d)
                 session.commit()
     except Exception as e:
+        session.rollback()
         logger.warning(f"Error fetching from yfinance for {ticker}: {e}")
 
 
