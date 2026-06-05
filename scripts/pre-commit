@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+# Folio pre-commit hook
+# Runs lint checks on staged files before allowing a commit.
+
+set -e
+
+echo "🔍 Running pre-commit checks..."
+
+# --- Backend lint (ruff, if available) ---
+staged_python_files=$(git diff --cached --name-only --diff-filter=d | grep -E '\.py$' || true)
+if [ -n "$staged_python_files" ]; then
+    if command -v ruff &> /dev/null; then
+        echo "  ▸ Backend: ruff check"
+        ruff check $staged_python_files --quiet
+    else
+        echo "  ▸ Backend: ruff not installed, skipping (pip install ruff to enable)"
+    fi
+fi
+
+# --- Frontend lint (eslint) ---
+staged_js_files=$(git diff --cached --name-only --diff-filter=d | grep -E '^frontend/.*\.(js|jsx|ts|tsx)$' || true)
+if [ -n "$staged_js_files" ]; then
+    if [ -d "frontend/node_modules" ]; then
+        # Convert paths to be relative to the frontend directory
+        frontend_files=$(echo "$staged_js_files" | sed 's|^frontend/||' | tr '\n' ' ')
+        echo "  ▸ Frontend: eslint $frontend_files"
+        cd frontend
+        # Run eslint on staged files
+        npx eslint $frontend_files --quiet
+        cd ..
+    else
+        echo "  ▸ Frontend: node_modules missing, skipping eslint"
+    fi
+fi
+
+echo "✅ Pre-commit checks passed."

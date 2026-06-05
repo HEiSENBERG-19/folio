@@ -25,6 +25,14 @@ dist/
 dist-ssr/
 *.local
 
+# Agent workflow scratch & logs
+.agents/scratch/
+.agents/logs/
+
+# Test artifacts
+test-results/
+playwright-report/
+
 # Editor / OS files
 .DS_Store
 .idea/

@@ -1,0 +1,7 @@
+# Folio — Agent Task Queue
+# Status: pending | in_progress | done | blocked
+#
+# This file tracks the current work queue for agent-driven development.
+# Update status as tasks progress through the workflow.
+
+tasks: []
