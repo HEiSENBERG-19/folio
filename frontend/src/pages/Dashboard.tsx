@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { TrendingUp, Wallet, DollarSign, ArrowUpRight, Briefcase } from 'lucide-react';
+import { TrendingUp, Wallet, DollarSign, IndianRupee, ArrowUpRight, Briefcase } from 'lucide-react';
 import { usePortfolioSummary, usePortfolioHistory, usePortfolioAllocation } from '../hooks/usePortfolio';
 import {
   AreaChart,
@@ -14,23 +14,70 @@ import {
   Cell,
   Legend,
 } from 'recharts';
+import { useCurrency } from '../context/CurrencyContext';
 
 const COLORS = ['#10b981', '#06b6d4', '#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b'];
-
-const formatCurrency = (val: number) => {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-  }).format(val);
-};
 
 const formatPercent = (val: number) => {
   const sign = val >= 0 ? '+' : '';
   return `${sign}${val.toFixed(2)}%`;
 };
 
+interface CustomHistoryTooltipProps {
+  active?: boolean;
+  payload?: Array<{ payload: { total_value: number; portfolio_value: number; cash_balance: number } }>;
+  label?: string;
+  formatCurrency: (value: number | null | undefined) => string;
+}
+
+const CustomHistoryTooltip = ({ active, payload, label, formatCurrency }: CustomHistoryTooltipProps) => {
+  if (active && payload && payload.length) {
+    const data = payload[0].payload;
+    return (
+      <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl shadow-lg backdrop-blur-md">
+        <p className="text-xs font-semibold text-slate-400">{label}</p>
+        <p className="text-sm font-bold text-emerald-400 mt-1">
+          Total: {formatCurrency(data.total_value)}
+        </p>
+        <p className="text-xs text-slate-300 mt-0.5">
+          Stock: {formatCurrency(data.portfolio_value)}
+        </p>
+        <p className="text-xs text-slate-300">
+          Cash: {formatCurrency(data.cash_balance)}
+        </p>
+      </div>
+    );
+  }
+  return null;
+};
+
+interface CustomAllocationTooltipProps {
+  active?: boolean;
+  payload?: Array<{ payload: { ticker: string; market_value: number; percentage: number } }>;
+  formatCurrency: (value: number | null | undefined) => string;
+}
+
+const CustomAllocationTooltip = ({ active, payload, formatCurrency }: CustomAllocationTooltipProps) => {
+  if (active && payload && payload.length) {
+    const data = payload[0].payload;
+    return (
+      <div className="bg-slate-900 border border-slate-800 p-3 rounded-xl shadow-lg backdrop-blur-md">
+        <p className="text-sm font-bold text-white">{data.ticker}</p>
+        <p className="text-xs text-slate-300 mt-1">
+          Market Value: {formatCurrency(data.market_value)}
+        </p>
+        <p className="text-xs font-semibold text-emerald-400">
+          Percentage: {data.percentage.toFixed(2)}%
+        </p>
+      </div>
+    );
+  }
+  return null;
+};
+
 export default function Dashboard() {
   const [period, setPeriod] = useState<string>('1Y');
+  const { formatCurrency, currencySymbol, currency } = useCurrency();
 
   const { data: summary, isLoading: summaryLoading } = usePortfolioSummary();
   const { data: history, isLoading: historyLoading } = usePortfolioHistory(period);
@@ -43,21 +90,21 @@ export default function Dashboard() {
   const stats = [
     {
       label: 'Net Portfolio Value',
-      value: summary ? formatCurrency(summary.net_portfolio_value) : '$0.00',
+      value: summary ? formatCurrency(summary.net_portfolio_value) : formatCurrency(0),
       change: null,
       icon: Wallet,
       colorClass: 'text-emerald-400 bg-emerald-500/10',
     },
     {
       label: 'Invested Capital',
-      value: summary ? formatCurrency(summary.total_invested) : '$0.00',
+      value: summary ? formatCurrency(summary.total_invested) : formatCurrency(0),
       change: null,
-      icon: DollarSign,
+      icon: currency === 'INR' ? IndianRupee : DollarSign,
       colorClass: 'text-blue-400 bg-blue-500/10',
     },
     {
       label: 'Unrealized P&L',
-      value: summary ? `${summary.total_unrealized_pnl >= 0 ? '+' : ''}${formatCurrency(summary.total_unrealized_pnl)}` : '$0.00',
+      value: summary ? `${summary.total_unrealized_pnl >= 0 ? '+' : ''}${formatCurrency(summary.total_unrealized_pnl)}` : formatCurrency(0),
       change: summary ? formatPercent(unrealizedPnlPct) : null,
       isPositive: summary ? summary.total_unrealized_pnl >= 0 : true,
       icon: ArrowUpRight,
@@ -65,59 +112,21 @@ export default function Dashboard() {
     },
     {
       label: 'Realized P&L',
-      value: summary ? `${summary.total_realized_pnl >= 0 ? '+' : ''}${formatCurrency(summary.total_realized_pnl)}` : '$0.00',
+      value: summary ? `${summary.total_realized_pnl >= 0 ? '+' : ''}${formatCurrency(summary.total_realized_pnl)}` : formatCurrency(0),
       change: null,
       icon: TrendingUp,
       colorClass: summary && summary.total_realized_pnl >= 0 ? 'text-teal-400 bg-teal-500/10' : 'text-red-400 bg-red-500/10',
     },
     {
       label: 'Cash Balance',
-      value: summary ? formatCurrency(summary.total_cash) : '$0.00',
+      value: summary ? formatCurrency(summary.total_cash) : formatCurrency(0),
       change: null,
       icon: Briefcase,
       colorClass: 'text-purple-400 bg-purple-500/10',
     },
   ];
 
-  // Custom tooltips
-  const CustomHistoryTooltip = ({ active, payload, label }: any) => {
-    if (active && payload && payload.length) {
-      const data = payload[0].payload;
-      return (
-        <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl shadow-lg backdrop-blur-md">
-          <p className="text-xs font-semibold text-slate-400">{label}</p>
-          <p className="text-sm font-bold text-emerald-400 mt-1">
-            Total: {formatCurrency(data.total_value)}
-          </p>
-          <p className="text-xs text-slate-300 mt-0.5">
-            Stock: {formatCurrency(data.portfolio_value)}
-          </p>
-          <p className="text-xs text-slate-300">
-            Cash: {formatCurrency(data.cash_balance)}
-          </p>
-        </div>
-      );
-    }
-    return null;
-  };
-
-  const CustomAllocationTooltip = ({ active, payload }: any) => {
-    if (active && payload && payload.length) {
-      const data = payload[0].payload;
-      return (
-        <div className="bg-slate-900 border border-slate-800 p-3 rounded-xl shadow-lg backdrop-blur-md">
-          <p className="text-sm font-bold text-white">{data.ticker}</p>
-          <p className="text-xs text-slate-300 mt-1">
-            Market Value: {formatCurrency(data.market_value)}
-          </p>
-          <p className="text-xs font-semibold text-emerald-400">
-            Percentage: {data.percentage.toFixed(2)}%
-          </p>
-        </div>
-      );
-    }
-    return null;
-  };
+  // Custom tooltips are defined outside of the component to prevent recreation during render.
 
   return (
     <div className="space-y-8">
@@ -238,9 +247,9 @@ export default function Dashboard() {
                     fontSize={11}
                     tickLine={false}
                     axisLine={false}
-                    tickFormatter={(val) => `$${val}`}
+                    tickFormatter={(val) => `${currencySymbol}${val}`}
                   />
-                  <Tooltip content={<CustomHistoryTooltip />} />
+                  <Tooltip content={<CustomHistoryTooltip formatCurrency={formatCurrency} />} />
                   <Area
                     type="monotone"
                     dataKey="total_value"
@@ -295,7 +304,7 @@ export default function Dashboard() {
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                     ))}
                   </Pie>
-                  <Tooltip content={<CustomAllocationTooltip />} />
+                  <Tooltip content={<CustomAllocationTooltip formatCurrency={formatCurrency} />} />
                   <Legend
                     verticalAlign="bottom"
                     height={36}

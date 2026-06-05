@@ -1,9 +1,11 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState } from 'react';
 import { Plus, Search, Trash2, X, AlertTriangle } from 'lucide-react';
 import { useTransactions, useCreateTransaction, useDeleteTransaction } from '../hooks/useTransactions';
 import { useAccounts, useCreateAccount } from '../hooks/useAccounts';
 import { useAssets, useCreateAsset } from '../hooks/useAssets';
 import type { TxType } from '../types';
+import { useCurrency } from '../context/CurrencyContext';
 
 const getLocalDatetimeString = () => {
   const now = new Date();
@@ -11,12 +13,7 @@ const getLocalDatetimeString = () => {
   return new Date(now.getTime() - tzOffset).toISOString().slice(0, 16);
 };
 
-const formatCurrency = (val: number) => {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-  }).format(val);
-};
+// Local formatCurrency helper removed in favor of useCurrency hook.
 
 const formatDate = (dateStr: string) => {
   const d = new Date(dateStr);
@@ -30,6 +27,7 @@ const formatDate = (dateStr: string) => {
 };
 
 export default function Transactions() {
+  const { formatCurrency, currencySymbol } = useCurrency();
   // Filters state
   const [selectedAccountFilter, setSelectedAccountFilter] = useState<string>('');
   const [selectedAssetFilter, setSelectedAssetFilter] = useState<string>('');
@@ -171,7 +169,7 @@ export default function Transactions() {
       executed_at: executedAtIso,
     };
 
-    let payload: any = null;
+    let payload: any;
 
     if (formType === 'BUY' || formType === 'SELL') {
       if (!matchedAsset) {
@@ -441,7 +439,7 @@ export default function Transactions() {
                         <option value="" disabled>Select Account</option>
                         {accounts?.map((acc) => (
                           <option key={acc.id} value={acc.id}>
-                            {acc.name} (${acc.cash_balance.toFixed(2)} cash)
+                            {acc.name} ({formatCurrency(acc.cash_balance)} cash)
                           </option>
                         ))}
                       </select>
@@ -547,7 +545,7 @@ export default function Transactions() {
                       />
                     </div>
                     <div className="space-y-1.5">
-                      <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider">Price per Unit ($)</label>
+                      <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider">Price per Unit ({currencySymbol})</label>
                       <input
                         type="number"
                         step="any"
@@ -570,7 +568,7 @@ export default function Transactions() {
                 </>
               ) : (
                 <div className="space-y-1.5">
-                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider">Cash Amount ($)</label>
+                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider">Cash Amount ({currencySymbol})</label>
                   <input
                     type="number"
                     step="any"

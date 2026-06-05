@@ -4,17 +4,21 @@ import AppShell from './components/layout/AppShell';
 import Dashboard from './pages/Dashboard';
 import Holdings from './pages/Holdings';
 import Transactions from './pages/Transactions';
+import { CurrencyProvider } from './context/CurrencyContext';
 
 export default function App() {
   return (
-    <Router>
-      <AppShell>
-        <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/holdings" element={<Holdings />} />
-          <Route path="/transactions" element={<Transactions />} />
-        </Routes>
-      </AppShell>
-    </Router>
+    <CurrencyProvider>
+      <Router>
+        <AppShell>
+          <Routes>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/holdings" element={<Holdings />} />
+            <Route path="/transactions" element={<Transactions />} />
+          </Routes>
+        </AppShell>
+      </Router>
+    </CurrencyProvider>
   );
 }
+

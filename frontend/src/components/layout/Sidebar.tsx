@@ -1,8 +1,11 @@
 import { NavLink } from 'react-router-dom';
 import { LayoutDashboard, ArrowRightLeft, Briefcase, TrendingUp } from 'lucide-react';
+import { useCurrency } from '../../context/CurrencyContext';
 
 
 export default function Sidebar() {
+  const { currency, setCurrency } = useCurrency();
+  
   const links = [
     { to: '/', label: 'Dashboard', icon: LayoutDashboard },
     { to: '/holdings', label: 'Holdings', icon: Briefcase },
@@ -35,9 +38,37 @@ export default function Sidebar() {
           </NavLink>
         ))}
       </nav>
-      <div className="p-4 border-t border-slate-900 text-xs text-slate-500 text-center">
-        v0.4.0
+      <div className="p-4 border-t border-slate-900 space-y-3">
+        <div className="flex items-center justify-between text-xs text-slate-400 px-1 font-medium">
+          <span>Display Currency</span>
+        </div>
+        <div className="grid grid-cols-2 gap-1 p-1 bg-slate-900 rounded-lg">
+          <button
+            onClick={() => setCurrency('USD')}
+            className={`py-1.5 text-xs font-semibold rounded-md transition-all duration-200 cursor-pointer ${
+              currency === 'USD'
+                ? 'bg-slate-800 text-emerald-400 shadow-sm'
+                : 'text-slate-500 hover:text-slate-300'
+            }`}
+          >
+            USD ($)
+          </button>
+          <button
+            onClick={() => setCurrency('INR')}
+            className={`py-1.5 text-xs font-semibold rounded-md transition-all duration-200 cursor-pointer ${
+              currency === 'INR'
+                ? 'bg-slate-800 text-emerald-400 shadow-sm'
+                : 'text-slate-500 hover:text-slate-300'
+            }`}
+          >
+            INR (₹)
+          </button>
+        </div>
+        <div className="text-center text-[10px] text-slate-600">
+          v0.4.0
+        </div>
       </div>
     </aside>
   );
 }
+
