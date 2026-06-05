@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.3.0] — 2026-06-05
+
+### Added
+- Created `Holding` model to track portfolio positions per account and asset using the Weighted Average Cost (WAC) method.
+- Implemented `holdings_service.py` to handle buy/sell logic, including cost basis accumulation and realized P&L calculation.
+- Created `transaction_service.py` to orchestrate cash balance updates and holdings recalculation, supporting full ledger replay logic.
+- Added reusable `AllocationDonutChart.tsx` component to modularize and decompose allocation charts on the Insights page.
+- Implemented automatic transaction-replay migration on database startup to populate `Holding` data.
+
+### Removed
+- Removed the complex FIFO engine (`fifo_engine.py`), `FIFOLot` and `LotClosure` database model classes.
+- Removed USD display currency support across all backend schemas/services and frontend components, hardcoding display currency to INR.
+- Deprecated the `USDINR=X` exchange rate api call and frontend currency context state.
+
 ## [v1.2.0] — 2026-06-05
 
 ### Added
