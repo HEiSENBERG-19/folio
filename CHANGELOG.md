@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+## [v1.4.0] — 2026-06-05
+
+### Added
+- Created CSV parsing service (`csv_import.py`) with comprehensive row validation to parse, validate, and convert trade history exports.
+- Implemented trade import transaction orchestrator with duplicate detection, UTC timezone alignment, chronological sorting, and partial success reporting.
+- Added a POST `/api/v1/transactions/import` endpoint to batch-import transactions with automatic creation of missing accounts and assets.
+- Implemented frontend CSV upload UI on the Transactions page with a drag-and-drop file picker, upload status feedback, and a detailed results modal showing success, duplicate skips, and failed validation messages.
+- Added comprehensive unit tests for CSV parsing, import validation, database persistence, and API endpoint routing.
+
 ## [v1.3.0] — 2026-06-05
 
 ### Added
