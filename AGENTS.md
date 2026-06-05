@@ -34,7 +34,7 @@
 - [x] M3: yfinance Integration & Portfolio API
 - [x] M4: Frontend UI Shell & Layout
 - [x] M5: TanStack Query & Charts
-- [ ] M6: End-to-End Testing & Validation
+- [x] M6: End-to-End Testing & Validation
 
 ## Reference Documents
 - `ARCHITECTURE.md` — Full technical architecture (frozen v1 spec)

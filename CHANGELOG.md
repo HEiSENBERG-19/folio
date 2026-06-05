@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.0.0] — 2026-06-05
+
+### Added
+- Comprehensive API integration tests for full trade lifecycle, transaction deletions with replay verification, portfolio history data integrity, and error bounds (insufficient shares, insufficient cash, FK delete conflicts) in `backend/tests/test_api.py`.
+- Deterministic scenario test validating FIFO math correctness, cash balances, lot status, and realized P&L calculations over a multi-day transaction sequence.
+- Performance sanity check benchmark verifying that `/portfolio/summary` resolves in under 2 seconds, and `/portfolio/history` resolves in under 5 seconds initially and under 500ms on subsequent requests using SQLite caching.
+- Verified zero TypeScript compilation and lint errors on the production-ready frontend bundle using Vite compiler.
+
 ## [v0.5.0] — 2026-06-05
 
 ### Added
