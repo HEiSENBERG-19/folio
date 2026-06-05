@@ -7,7 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v0.4.0] — 2026-06-04
+
+### Added
+- Scaffolding of the React + Vite + TypeScript frontend project with dev dependencies
+- Custom Vite plugin registration for Tailwind CSS v4 and backend API proxy settings
+- Styling infrastructure with custom design tokens, dark background aesthetics, custom scrollbars, and micro-animations
+- Client-side navigation Sidebar with link highlights and Lucide icons
+- Responsive layout AppShell supporting mobile viewport hamburger toggle drawer
+- Typescript interfaces representing database models and API schema definitions
+- Mock-data-driven page views for Dashboard (stat cards, line/pie chart containers), Transactions (search/filter bar, transaction list table), and Holdings (position tables, progress bars)
+- Zero-error typescript compilation verified by `npm run build`
+
 ## [v0.3.0] — 2026-06-04
+
 
 ### Added
 - Historical price fetching from yfinance with a persistent local SQLite `PriceCache`

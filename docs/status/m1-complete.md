@@ -24,7 +24,7 @@
 ### 1.3 — FastAPI App Factory
 - Created `backend/app/main.py`:
   - FastAPI app named "Folio API"
-  - CORS middleware allowing `http://localhost:5173`
+  - CORS middleware allowing `http://localhost:5174`
   - `lifespan` handler calling `create_db_and_tables()` on startup
   - Routers mounted at `/api/v1`
   - Root `GET /` healthcheck returning `{"status": "ok"}`

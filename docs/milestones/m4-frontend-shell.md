@@ -86,7 +86,7 @@ Verify milestone execution:
    ```bash
    cd frontend && npm run dev
    ```
-2. Open `http://localhost:5173` in a browser.
+2. Open `http://localhost:5174` in a browser.
 3. Assert:
    - Sidebar navigates between `/`, `/transactions`, and `/holdings` smoothly.
    - Page layouts render correctly in dark mode.

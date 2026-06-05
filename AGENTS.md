@@ -32,7 +32,7 @@
 - [x] M1: Backend Setup & Database Layer
 - [x] M2: FIFO Engine & Transaction Processing
 - [x] M3: yfinance Integration & Portfolio API
-- [ ] M4: Frontend UI Shell & Layout
+- [x] M4: Frontend UI Shell & Layout
 - [ ] M5: TanStack Query & Charts
 - [ ] M6: End-to-End Testing & Validation
 
