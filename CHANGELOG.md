@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.1.0] — 2026-06-05
+
+### Added
+- Introduced a frontend global `CurrencyContext` and `useCurrency` hook to support dynamic currency switching and persistence (stored in `localStorage` under `folio_currency`).
+- Added support for locale-aware formatting for USD (`en-US`) and INR (`en-IN` with lakhs/crores formatting and the `₹` symbol).
+- Integrated currency toggle widget in the Sidebar navigation.
+- Configured dynamic currency formatting and symbol updates across Dashboard stat cards, Recharts area/pie chart axes and tooltips, Holdings table rows, and Transaction page account balances and forms.
+
 ## [v1.0.0] — 2026-06-05
 
 ### Added
