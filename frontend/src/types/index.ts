@@ -103,3 +103,12 @@ export interface PortfolioInsights {
   cash_balances: CashInsightDetail[];
 }
 
+export interface CsvImportResult {
+  total_rows: number;
+  imported_count: number;
+  skipped_count: number;
+  errors: Array<{ row: number; message: string }>;
+  created_accounts: string[];
+  created_assets: string[];
+}
+
