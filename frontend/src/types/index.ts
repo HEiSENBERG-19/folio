@@ -4,6 +4,7 @@ export interface Account {
   id?: number;
   name: string;
   cash_balance: number;
+  currency: string;
   created_at?: string;
   updated_at?: string;
 }
@@ -67,3 +68,39 @@ export interface AllocationSlice {
   market_value: number;
   percentage: number;
 }
+
+export interface HoldingInsightDetail {
+  ticker: string;
+  asset_name: string;
+  total_shares: number;
+  market_value_native: number;
+  currency: string;
+  asset_class: string;
+  sector?: string | null;
+  industry?: string | null;
+  country?: string | null;
+  exchange?: string | null;
+  beta?: number | null;
+  market_cap?: number | null;
+  fifty_two_week_high?: number | null;
+  fifty_two_week_low?: number | null;
+  trailing_pe?: number | null;
+  dividend_yield?: number | null;
+  price_to_book?: number | null;
+  unrealized_pnl_native: number;
+}
+
+export interface CashInsightDetail {
+  account_id: number;
+  account_name: string;
+  cash_balance_native: number;
+  currency: string;
+  stock_value_native: number;
+}
+
+export interface PortfolioInsights {
+  holdings: HoldingInsightDetail[];
+  cash_balances: CashInsightDetail[];
+  usd_inr_rate: number;
+}
+

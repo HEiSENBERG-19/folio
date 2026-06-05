@@ -1,6 +1,16 @@
 from sqlmodel import Session, select
-from app.models import Asset, FIFOLot, LotClosure, Account, Transaction, TxType
-from app.schemas import HoldingDetail, PortfolioSummary, PortfolioHistoryPoint, PortfolioHistory, AllocationSlice
+import yfinance as yf
+from app.models import Asset, FIFOLot, LotClosure, Account, Transaction, TxType, AssetMetadata
+from app.schemas import (
+    HoldingDetail,
+    PortfolioSummary,
+    PortfolioHistoryPoint,
+    PortfolioHistory,
+    AllocationSlice,
+    HoldingInsightDetail,
+    CashInsightDetail,
+    PortfolioInsights,
+)
 from app.services import price_service
 from datetime import date, datetime, timezone, timedelta
 
@@ -223,3 +233,167 @@ def get_portfolio_allocation(session: Session) -> list[AllocationSlice]:
             )
         )
     return slices
+
+
+def get_usd_inr_rate() -> float:
+    try:
+        ticker = yf.Ticker("USDINR=X")
+        price = ticker.fast_info.get("lastPrice", None)
+        if price is None:
+            hist = ticker.history(period="1d")
+            if not hist.empty:
+                price = float(hist['Close'].iloc[-1])
+        if price is not None:
+            return float(price)
+    except Exception:
+        pass
+    return 83.5 # Standard fallback
+
+
+def fetch_and_cache_metadata(session: Session, asset: Asset) -> AssetMetadata:
+    metadata = session.exec(select(AssetMetadata).where(AssetMetadata.asset_id == asset.id)).first()
+    now = datetime.now(timezone.utc)
+    if metadata:
+        fetched_at = metadata.fetched_at
+        if fetched_at.tzinfo is None:
+            fetched_at = fetched_at.replace(tzinfo=timezone.utc)
+        if (now - fetched_at).days < 1:
+            return metadata
+
+    try:
+        ticker_obj = yf.Ticker(asset.ticker)
+        info = ticker_obj.info
+        
+        quote_type = info.get("quoteType", "EQUITY")
+        asset_class = "Equity"
+        if quote_type == "ETF":
+            asset_class = "ETF"
+        elif quote_type == "MUTUALFUND":
+            asset_class = "Mutual Fund"
+        elif quote_type == "CRYPTOCURRENCY":
+            asset_class = "Crypto"
+
+        currency = info.get("currency")
+        if not currency:
+            currency = "INR" if (asset.ticker.endswith(".NS") or asset.ticker.endswith(".BO")) else "USD"
+
+        long_name = info.get("longName", asset.name or asset.ticker)
+        if not asset.name and long_name:
+            asset.name = long_name
+            session.add(asset)
+
+        data = {
+            "currency": currency,
+            "asset_class": asset_class,
+            "sector": info.get("sector"),
+            "industry": info.get("industry"),
+            "country": info.get("country") or ("India" if currency == "INR" else "United States"),
+            "exchange": info.get("exchange"),
+            "beta": info.get("beta"),
+            "market_cap": info.get("marketCap"),
+            "long_name": long_name,
+            "fifty_two_week_high": info.get("fiftyTwoWeekHigh"),
+            "fifty_two_week_low": info.get("fiftyTwoWeekLow"),
+            "trailing_pe": info.get("trailingPE"),
+            "dividend_yield": info.get("dividendYield"),
+            "price_to_book": info.get("priceToBook"),
+            "fetched_at": now
+        }
+
+        if not metadata:
+            metadata = AssetMetadata(asset_id=asset.id, **data)
+        else:
+            for k, v in data.items():
+                setattr(metadata, k, v)
+        
+        session.add(metadata)
+        session.commit()
+        session.refresh(metadata)
+    except Exception:
+        session.rollback()
+        # Create minimal fallback to avoid failure loops
+        if not metadata:
+            currency = "INR" if (asset.ticker.endswith(".NS") or asset.ticker.endswith(".BO")) else "USD"
+            metadata = AssetMetadata(
+                asset_id=asset.id,
+                currency=currency,
+                asset_class="Equity",
+                sector="Other",
+                country="India" if currency == "INR" else "United States",
+                long_name=asset.name or asset.ticker,
+                fetched_at=now
+            )
+            session.add(metadata)
+            session.commit()
+            session.refresh(metadata)
+    return metadata
+
+
+def get_portfolio_insights(session: Session) -> PortfolioInsights:
+    summary = get_portfolio_summary(session)
+    usd_inr_rate = get_usd_inr_rate()
+    
+    # Pre-fetch and cache metadata for all active assets
+    assets = session.exec(select(Asset)).all()
+    asset_map = {a.ticker: a for a in assets}
+    asset_id_map = {a.id: a for a in assets}
+    
+    holdings_insights = []
+    price_map = {}
+    for h in summary.holdings:
+        asset = asset_map.get(h.ticker)
+        if asset:
+            meta = fetch_and_cache_metadata(session, asset)
+            holdings_insights.append(
+                HoldingInsightDetail(
+                    ticker=h.ticker,
+                    asset_name=h.asset_name,
+                    total_shares=h.total_shares,
+                    market_value_native=h.market_value,  # holding.market_value is native in summary
+                    currency=meta.currency,
+                    asset_class=meta.asset_class,
+                    sector=meta.sector,
+                    industry=meta.industry,
+                    country=meta.country,
+                    exchange=meta.exchange,
+                    beta=meta.beta,
+                    market_cap=meta.market_cap,
+                    fifty_two_week_high=meta.fifty_two_week_high,
+                    fifty_two_week_low=meta.fifty_two_week_low,
+                    trailing_pe=meta.trailing_pe,
+                    dividend_yield=meta.dividend_yield,
+                    price_to_book=meta.price_to_book,
+                    unrealized_pnl_native=h.unrealized_pnl
+                )
+            )
+            price_map[h.ticker] = h.current_price
+            
+    # Calculate stock value per account
+    open_lots = session.exec(select(FIFOLot).where(FIFOLot.quantity_remaining > 0)).all()
+    account_stock_val = {}
+    for lot in open_lots:
+        asset = asset_id_map.get(lot.asset_id)
+        if asset:
+            price = price_map.get(asset.ticker, 0.0)
+            val = lot.quantity_remaining * price
+            account_stock_val[lot.account_id] = account_stock_val.get(lot.account_id, 0.0) + val
+
+    # Fetch accounts & cash
+    accounts = session.exec(select(Account)).all()
+    cash_details = [
+        CashInsightDetail(
+            account_id=acc.id,
+            account_name=acc.name,
+            cash_balance_native=acc.cash_balance,
+            currency=acc.currency,
+            stock_value_native=account_stock_val.get(acc.id, 0.0)
+        )
+        for acc in accounts
+    ]
+    
+    return PortfolioInsights(
+        holdings=holdings_insights,
+        cash_balances=cash_details,
+        usd_inr_rate=usd_inr_rate
+    )
+

@@ -25,7 +25,7 @@ def create_account(payload: AccountCreate, session: Session = Depends(get_sessio
     if existing:
         raise HTTPException(status_code=409, detail="Account name already exists")
 
-    account = Account(name=payload.name)
+    account = Account(name=payload.name, currency=payload.currency)
     session.add(account)
     try:
         session.commit()
@@ -64,6 +64,8 @@ def update_account(
         raise HTTPException(status_code=409, detail="Account name already exists")
 
     account.name = payload.name
+    if payload.currency is not None:
+        account.currency = payload.currency
     account.updated_at = datetime.now(timezone.utc)
     session.add(account)
     try:

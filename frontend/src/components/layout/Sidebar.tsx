@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, ArrowRightLeft, Briefcase, TrendingUp } from 'lucide-react';
+import { LayoutDashboard, ArrowRightLeft, Briefcase, TrendingUp, BarChart3 } from 'lucide-react';
 import { useCurrency } from '../../context/CurrencyContext';
 
 
@@ -10,6 +10,7 @@ export default function Sidebar() {
     { to: '/', label: 'Dashboard', icon: LayoutDashboard },
     { to: '/holdings', label: 'Holdings', icon: Briefcase },
     { to: '/transactions', label: 'Transactions', icon: ArrowRightLeft },
+    { to: '/insights', label: 'Insights', icon: BarChart3 },
   ];
 
   return (

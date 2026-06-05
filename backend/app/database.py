@@ -14,3 +14,13 @@ def get_session():
 
 def create_db_and_tables():
     SQLModel.metadata.create_all(engine)
+    from sqlalchemy import text
+    with engine.begin() as conn:
+        try:
+            conn.execute(text("SELECT currency FROM account LIMIT 1"))
+        except Exception:
+            try:
+                conn.execute(text("ALTER TABLE account ADD COLUMN currency VARCHAR DEFAULT 'USD'"))
+            except Exception as e:
+                print(f"Migration error: {e}")
+

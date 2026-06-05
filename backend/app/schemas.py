@@ -6,10 +6,12 @@ from app.models import TxType
 
 class AccountCreate(BaseModel):
     name: str
+    currency: Optional[str] = "USD"
 
 
 class AccountUpdate(BaseModel):
     name: str
+    currency: Optional[str] = None
 
 
 class AssetCreate(BaseModel):
@@ -94,4 +96,40 @@ class AllocationSlice(BaseModel):
     ticker: str
     market_value: float
     percentage: float
+
+
+class HoldingInsightDetail(BaseModel):
+    ticker: str
+    asset_name: str
+    total_shares: float
+    market_value_native: float
+    currency: str
+    asset_class: str
+    sector: Optional[str] = None
+    industry: Optional[str] = None
+    country: Optional[str] = None
+    exchange: Optional[str] = None
+    beta: Optional[float] = None
+    market_cap: Optional[float] = None
+    fifty_two_week_high: Optional[float] = None
+    fifty_two_week_low: Optional[float] = None
+    trailing_pe: Optional[float] = None
+    dividend_yield: Optional[float] = None
+    price_to_book: Optional[float] = None
+    unrealized_pnl_native: float
+
+
+class CashInsightDetail(BaseModel):
+    account_id: int
+    account_name: str
+    cash_balance_native: float
+    currency: str
+    stock_value_native: float = 0.0
+
+
+class PortfolioInsights(BaseModel):
+    holdings: list[HoldingInsightDetail]
+    cash_balances: list[CashInsightDetail]
+    usd_inr_rate: float
+
 

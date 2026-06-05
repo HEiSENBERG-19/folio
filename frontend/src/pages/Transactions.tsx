@@ -51,6 +51,7 @@ export default function Transactions() {
   // Inline creation states
   const [showNewAccountInput, setShowNewAccountInput] = useState(false);
   const [newAccountName, setNewAccountName] = useState('');
+  const [newAccountCurrency, setNewAccountCurrency] = useState('USD');
 
   // Queries & Mutations
   const { data: accounts } = useAccounts();
@@ -115,11 +116,12 @@ export default function Transactions() {
     if (!newAccountName.trim()) return;
 
     createAccount.mutate(
-      { name: newAccountName.trim() },
+      { name: newAccountName.trim(), currency: newAccountCurrency },
       {
         onSuccess: (acc) => {
           setFormAccountId(String(acc.id));
           setNewAccountName('');
+          setNewAccountCurrency('USD');
           setShowNewAccountInput(false);
           showToast(`Account "${acc.name}" created successfully`, 'success');
         },
@@ -437,11 +439,20 @@ export default function Transactions() {
                         className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-300 focus:outline-none focus:border-slate-700 focus:ring-1 focus:ring-slate-700 cursor-pointer"
                       >
                         <option value="" disabled>Select Account</option>
-                        {accounts?.map((acc) => (
-                          <option key={acc.id} value={acc.id}>
-                            {acc.name} ({formatCurrency(acc.cash_balance)} cash)
-                          </option>
-                        ))}
+                        {accounts?.map((acc) => {
+                          const locale = acc.currency === 'INR' ? 'en-IN' : 'en-US';
+                          const formattedCash = new Intl.NumberFormat(locale, {
+                            style: 'currency',
+                            currency: acc.currency || 'USD',
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          }).format(acc.cash_balance);
+                          return (
+                            <option key={acc.id} value={acc.id}>
+                              {acc.name} ({formattedCash} cash)
+                            </option>
+                          );
+                        })}
                       </select>
                       <button
                         type="button"
@@ -458,8 +469,16 @@ export default function Transactions() {
                         placeholder="Account name (e.g. Robinhood)"
                         value={newAccountName}
                         onChange={(e) => setNewAccountName(e.target.value)}
-                        className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-300 focus:outline-none focus:border-slate-700 focus:ring-1 focus:ring-slate-700"
+                        className="flex-1 min-w-[120px] bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-300 focus:outline-none focus:border-slate-700 focus:ring-1 focus:ring-slate-700"
                       />
+                      <select
+                        value={newAccountCurrency}
+                        onChange={(e) => setNewAccountCurrency(e.target.value)}
+                        className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs font-medium text-slate-300 focus:outline-none focus:border-slate-700 cursor-pointer"
+                      >
+                        <option value="USD">USD ($)</option>
+                        <option value="INR">INR (₹)</option>
+                      </select>
                       <button
                         type="button"
                         onClick={handleCreateAccountInline}
