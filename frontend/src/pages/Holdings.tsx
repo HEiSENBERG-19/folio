@@ -1,14 +1,9 @@
 import { Info } from 'lucide-react';
 import { usePortfolioSummary } from '../hooks/usePortfolio';
-
-const formatCurrency = (val: number) => {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-  }).format(val);
-};
+import { useCurrency } from '../context/CurrencyContext';
 
 export default function Holdings() {
+  const { formatCurrency } = useCurrency();
   const { data: summary, isLoading } = usePortfolioSummary();
 
   const holdings = summary?.holdings || [];
