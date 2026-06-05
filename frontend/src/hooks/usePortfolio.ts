@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import api from '../api/client';
-import type { PortfolioSummary, PortfolioHistory, AllocationSlice } from '../types';
+import type { PortfolioSummary, PortfolioHistory, AllocationSlice, PortfolioInsights } from '../types';
 
 export function usePortfolioSummary() {
   return useQuery<PortfolioSummary>({
@@ -29,6 +29,16 @@ export function usePortfolioAllocation() {
     queryKey: ['portfolio', 'allocation'],
     queryFn: async () => {
       const response = await api.get('/portfolio/allocation');
+      return response.data;
+    },
+  });
+}
+
+export function usePortfolioInsights() {
+  return useQuery<PortfolioInsights>({
+    queryKey: ['portfolio', 'insights'],
+    queryFn: async () => {
+      const response = await api.get('/portfolio/insights');
       return response.data;
     },
   });

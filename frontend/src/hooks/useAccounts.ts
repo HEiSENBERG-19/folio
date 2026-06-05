@@ -14,7 +14,7 @@ export function useAccounts() {
 
 export function useCreateAccount() {
   const queryClient = useQueryClient();
-  return useMutation<Account, Error, { name: string }>({
+  return useMutation<Account, Error, { name: string; currency?: string }>({
     mutationFn: async (payload) => {
       const response = await api.post('/accounts', payload);
       return response.data;
