@@ -6,7 +6,7 @@ from app.models import TxType
 
 class AccountCreate(BaseModel):
     name: str
-    currency: Optional[str] = "USD"
+    currency: Optional[str] = "INR"
 
 
 class AccountUpdate(BaseModel):
@@ -130,6 +130,5 @@ class CashInsightDetail(BaseModel):
 class PortfolioInsights(BaseModel):
     holdings: list[HoldingInsightDetail]
     cash_balances: list[CashInsightDetail]
-    usd_inr_rate: float
 
 

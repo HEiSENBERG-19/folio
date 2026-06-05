@@ -5,7 +5,7 @@ from typing import Optional
 from app.database import get_session
 from app.models import Transaction, Account, Asset, TxType
 from app.schemas import TransactionCreate
-from app.services.fifo_engine import process_transaction, replay_ledger
+from app.services.transaction_service import process_transaction, replay_account_holdings
 
 router = APIRouter(prefix="/transactions", tags=["transactions"])
 
@@ -91,7 +91,7 @@ def delete_transaction(transaction_id: int, session: Session = Depends(get_sessi
 
     try:
         session.flush()
-        replay_ledger(session, account_id)
+        replay_account_holdings(session, account_id)
         session.commit()
     except ValueError as e:
         session.rollback()

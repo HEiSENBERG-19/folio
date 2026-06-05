@@ -101,6 +101,5 @@ export interface CashInsightDetail {
 export interface PortfolioInsights {
   holdings: HoldingInsightDetail[];
   cash_balances: CashInsightDetail[];
-  usd_inr_rate: number;
 }
 

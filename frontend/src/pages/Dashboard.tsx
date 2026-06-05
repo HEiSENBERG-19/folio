@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { TrendingUp, Wallet, DollarSign, IndianRupee, ArrowUpRight, Briefcase } from 'lucide-react';
+import { TrendingUp, Wallet, IndianRupee, ArrowUpRight, Briefcase } from 'lucide-react';
 import { usePortfolioSummary, usePortfolioHistory, usePortfolioAllocation } from '../hooks/usePortfolio';
 import {
   AreaChart,
@@ -77,7 +77,7 @@ const CustomAllocationTooltip = ({ active, payload, formatCurrency }: CustomAllo
 
 export default function Dashboard() {
   const [period, setPeriod] = useState<string>('1Y');
-  const { formatCurrency, currencySymbol, currency } = useCurrency();
+  const { formatCurrency, currencySymbol } = useCurrency();
 
   const { data: summary, isLoading: summaryLoading } = usePortfolioSummary();
   const { data: history, isLoading: historyLoading } = usePortfolioHistory(period);
@@ -99,7 +99,7 @@ export default function Dashboard() {
       label: 'Invested Capital',
       value: summary ? formatCurrency(summary.total_invested) : formatCurrency(0),
       change: null,
-      icon: currency === 'INR' ? IndianRupee : DollarSign,
+      icon: IndianRupee,
       colorClass: 'text-blue-400 bg-blue-500/10',
     },
     {

@@ -51,7 +51,6 @@ export default function Transactions() {
   // Inline creation states
   const [showNewAccountInput, setShowNewAccountInput] = useState(false);
   const [newAccountName, setNewAccountName] = useState('');
-  const [newAccountCurrency, setNewAccountCurrency] = useState('USD');
 
   // Queries & Mutations
   const { data: accounts } = useAccounts();
@@ -98,7 +97,7 @@ export default function Transactions() {
   });
 
   const handleDelete = (id: number) => {
-    if (window.confirm('Are you sure you want to delete this transaction? This action will recalculate your FIFO ledger positions.')) {
+    if (window.confirm('Are you sure you want to delete this transaction? This action will recalculate your positions.')) {
       deleteTransaction.mutate(id, {
         onSuccess: () => {
           showToast('Transaction deleted successfully', 'success');
@@ -116,12 +115,11 @@ export default function Transactions() {
     if (!newAccountName.trim()) return;
 
     createAccount.mutate(
-      { name: newAccountName.trim(), currency: newAccountCurrency },
+      { name: newAccountName.trim(), currency: 'INR' },
       {
         onSuccess: (acc) => {
           setFormAccountId(String(acc.id));
           setNewAccountName('');
-          setNewAccountCurrency('USD');
           setShowNewAccountInput(false);
           showToast(`Account "${acc.name}" created successfully`, 'success');
         },
@@ -440,10 +438,9 @@ export default function Transactions() {
                       >
                         <option value="" disabled>Select Account</option>
                         {accounts?.map((acc) => {
-                          const locale = acc.currency === 'INR' ? 'en-IN' : 'en-US';
-                          const formattedCash = new Intl.NumberFormat(locale, {
+                          const formattedCash = new Intl.NumberFormat('en-IN', {
                             style: 'currency',
-                            currency: acc.currency || 'USD',
+                            currency: 'INR',
                             minimumFractionDigits: 2,
                             maximumFractionDigits: 2,
                           }).format(acc.cash_balance);
@@ -471,14 +468,6 @@ export default function Transactions() {
                         onChange={(e) => setNewAccountName(e.target.value)}
                         className="flex-1 min-w-[120px] bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-300 focus:outline-none focus:border-slate-700 focus:ring-1 focus:ring-slate-700"
                       />
-                      <select
-                        value={newAccountCurrency}
-                        onChange={(e) => setNewAccountCurrency(e.target.value)}
-                        className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs font-medium text-slate-300 focus:outline-none focus:border-slate-700 cursor-pointer"
-                      >
-                        <option value="USD">USD ($)</option>
-                        <option value="INR">INR (₹)</option>
-                      </select>
                       <button
                         type="button"
                         onClick={handleCreateAccountInline}

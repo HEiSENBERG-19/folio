@@ -1,13 +1,6 @@
 import { usePortfolioInsights } from '../hooks/usePortfolio';
 import { useCurrency } from '../context/CurrencyContext';
-import {
-  PieChart,
-  Pie,
-  Cell,
-  Tooltip,
-  ResponsiveContainer,
-  Treemap
-} from 'recharts';
+import { Treemap, ResponsiveContainer } from 'recharts';
 import {
   TrendingUp,
   Percent,
@@ -16,6 +9,7 @@ import {
   Compass,
   AlertCircle
 } from 'lucide-react';
+import AllocationDonutChart from '../components/charts/AllocationDonutChart';
 
 const COLORS = ['#10b981', '#06b6d4', '#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b', '#14b8a6', '#6366f1'];
 
@@ -28,24 +22,21 @@ interface CustomTreemapContentProps {
   unrealized_pnl_pct?: number;
 }
 
-// Recharts Custom Treemap content renderer
 const CustomTreemapContent = (props: CustomTreemapContentProps) => {
   const { x = 0, y = 0, width = 0, height = 0, name = '', unrealized_pnl_pct } = props;
   if (width < 25 || height < 15) return null;
 
-  let color = '#475569'; // slate-600 default
+  let color = '#475569';
   if (unrealized_pnl_pct !== undefined && unrealized_pnl_pct !== null) {
     const p = unrealized_pnl_pct;
     if (p > 0) {
       const ratio = Math.min(p / 15, 1);
-      // Interpolate between slate-600 (#475569) and emerald-500 (#10b981)
       const r = Math.round(71 + (16 - 71) * ratio);
       const g = Math.round(85 + (185 - 85) * ratio);
       const b = Math.round(105 + (129 - 105) * ratio);
       color = `rgb(${r}, ${g}, ${b})`;
     } else if (p < 0) {
       const ratio = Math.min(Math.abs(p) / 15, 1);
-      // Interpolate between slate-600 (#475569) and rose-500 (#f43f5e)
       const r = Math.round(71 + (244 - 71) * ratio);
       const g = Math.round(85 + (63 - 85) * ratio);
       const b = Math.round(105 + (94 - 105) * ratio);
@@ -62,7 +53,7 @@ const CustomTreemapContent = (props: CustomTreemapContentProps) => {
         height={height}
         style={{
           fill: color,
-          stroke: '#0f172a', // slate-900 border
+          stroke: '#0f172a',
           strokeWidth: 2,
           strokeOpacity: 1,
         }}
@@ -84,7 +75,7 @@ const CustomTreemapContent = (props: CustomTreemapContentProps) => {
           x={x + width / 2}
           y={y + height / 2 + 11}
           textAnchor="middle"
-          fill="#e2e8f0" // slate-200
+          fill="#e2e8f0"
           fontSize={9.5}
           fontWeight="500"
         >
@@ -95,38 +86,8 @@ const CustomTreemapContent = (props: CustomTreemapContentProps) => {
   );
 };
 
-interface CustomPieTooltipProps {
-  active?: boolean;
-  payload?: Array<{
-    payload: {
-      name: string;
-      value: number;
-      percentage: number;
-    };
-  }>;
-}
-
-const CustomPieTooltip = ({ active, payload }: CustomPieTooltipProps) => {
-  const { formatCurrency } = useCurrency();
-  if (active && payload && payload.length) {
-    const dataPoint = payload[0].payload;
-    return (
-      <div className="bg-slate-900 border border-slate-800 p-3 rounded-xl shadow-lg backdrop-blur-md">
-        <p className="text-xs font-semibold text-slate-400">{dataPoint.name}</p>
-        <p className="text-sm font-bold text-white mt-1">
-          Value: {formatCurrency(dataPoint.value)}
-        </p>
-        <p className="text-xs font-semibold text-emerald-400">
-          Share: {dataPoint.percentage.toFixed(2)}%
-        </p>
-      </div>
-    );
-  }
-  return null;
-};
-
 export default function Insights() {
-  const { currency, formatCurrency } = useCurrency();
+  const { formatCurrency } = useCurrency();
   const { data, isLoading, isError } = usePortfolioInsights();
 
   if (isLoading) {
@@ -161,17 +122,11 @@ export default function Insights() {
     );
   }
 
-  const { holdings, cash_balances, usd_inr_rate } = data;
+  const { holdings, cash_balances } = data;
 
-  const convert = (val: number, from: string) => {
-    if (from === currency) return val;
-    return currency === 'USD' ? val / usd_inr_rate : val * usd_inr_rate;
-  };
-
-  // 1. Calculate holding and cash values in display currency
   const normalizedHoldings = holdings.map(h => {
-    const mv = convert(h.market_value_native, h.currency);
-    const cost = convert(h.market_value_native - h.unrealized_pnl_native, h.currency);
+    const mv = h.market_value_native;
+    const cost = h.market_value_native - h.unrealized_pnl_native;
     const pnl = mv - cost;
     const pnlPct = cost > 0 ? (pnl / cost) * 100 : 0;
     return {
@@ -184,8 +139,8 @@ export default function Insights() {
 
   const normalizedCash = cash_balances.map(c => ({
     ...c,
-    cashBalance: convert(c.cash_balance_native, c.currency),
-    stockValue: convert(c.stock_value_native, c.currency)
+    cashBalance: c.cash_balance_native,
+    stockValue: c.stock_value_native
   }));
 
   const holdingsVal = normalizedHoldings.reduce((sum, h) => sum + h.marketValue, 0);
@@ -212,30 +167,23 @@ export default function Insights() {
     );
   }
 
-  // 2. Compute Weighted Metrics
-  // Weighted Beta: sum(beta * MV) / totalVal (cash beta treated as 0)
   const holdingsWithBeta = normalizedHoldings.filter(h => h.beta !== null && h.beta !== undefined);
   const sumBetaMV = holdingsWithBeta.reduce((sum, h) => sum + (h.beta || 0) * h.marketValue, 0);
   const weightedBeta = totalVal > 0 ? sumBetaMV / totalVal : 0;
 
-  // Weighted P/E: sum(PE * MV) / sum(MV of assets with PE)
   const holdingsWithPE = normalizedHoldings.filter(h => h.trailing_pe && h.trailing_pe > 0);
   const peValSum = holdingsWithPE.reduce((sum, h) => sum + h.marketValue, 0);
   const sumPEMV = holdingsWithPE.reduce((sum, h) => sum + (h.trailing_pe || 0) * h.marketValue, 0);
   const weightedPE = peValSum > 0 ? sumPEMV / peValSum : null;
 
-  // Weighted Dividend Yield: sum(yield * MV) / holdingsVal
   const sumYieldMV = normalizedHoldings.reduce((sum, h) => sum + (h.dividend_yield || 0) * h.marketValue, 0);
   const weightedDivYield = holdingsVal > 0 ? (sumYieldMV / holdingsVal) * 100 : 0;
 
-  // Weighted P/B: sum(PB * MV) / sum(MV of assets with PB)
   const holdingsWithPB = normalizedHoldings.filter(h => h.price_to_book && h.price_to_book > 0);
   const pbValSum = holdingsWithPB.reduce((sum, h) => sum + h.marketValue, 0);
   const sumPBMV = holdingsWithPB.reduce((sum, h) => sum + (h.price_to_book || 0) * h.marketValue, 0);
   const weightedPB = pbValSum > 0 ? sumPBMV / pbValSum : null;
 
-  // 3. Allocations
-  // Sector Allocation
   const sectorMap: { [key: string]: number } = {};
   normalizedHoldings.forEach(h => {
     const sec = h.sector || 'Other';
@@ -247,7 +195,6 @@ export default function Insights() {
     percentage: (value / totalVal) * 100
   })).sort((a, b) => b.value - a.value);
 
-  // Security Type Allocation
   const typeMap: { [key: string]: number } = {};
   normalizedHoldings.forEach(h => {
     typeMap[h.asset_class] = (typeMap[h.asset_class] || 0) + h.marketValue;
@@ -261,13 +208,11 @@ export default function Insights() {
     percentage: (value / totalVal) * 100
   })).sort((a, b) => b.value - a.value);
 
-  // Country/Region Allocation
   const countryMap: { [key: string]: number } = {};
   normalizedHoldings.forEach(h => {
     const c = h.country || 'Other';
     countryMap[c] = (countryMap[c] || 0) + h.marketValue;
   });
-  // Assign cash to country of account currency
   normalizedCash.forEach(c => {
     const country = c.currency === 'INR' ? 'India' : 'United States';
     countryMap[country] = (countryMap[country] || 0) + c.cashBalance;
@@ -278,7 +223,6 @@ export default function Insights() {
     percentage: (value / totalVal) * 100
   })).sort((a, b) => b.value - a.value);
 
-  // Currency Allocation
   const currMap: { [key: string]: number } = {};
   normalizedHoldings.forEach(h => {
     currMap[h.currency] = (currMap[h.currency] || 0) + h.marketValue;
@@ -292,7 +236,6 @@ export default function Insights() {
     percentage: (value / totalVal) * 100
   })).sort((a, b) => b.value - a.value);
 
-  // Account Allocation (Cash + Stock grouped by account name)
   const accountMap: { [key: string]: number } = {};
   normalizedCash.forEach(c => {
     accountMap[c.account_name] = c.cashBalance + c.stockValue;
@@ -303,12 +246,11 @@ export default function Insights() {
     percentage: (value / totalVal) * 100
   })).sort((a, b) => b.value - a.value);
 
-  // Risk Profile: Cash, Low Risk (<= 0.8), Medium Risk (0.8 - 1.2), High Risk (> 1.2)
   let lowRiskVal = 0;
   let medRiskVal = 0;
   let highRiskVal = 0;
   normalizedHoldings.forEach(h => {
-    const b = h.beta ?? 1.0; // default to medium if none
+    const b = h.beta ?? 1.0;
     if (b <= 0.8) lowRiskVal += h.marketValue;
     else if (b > 1.2) highRiskVal += h.marketValue;
     else medRiskVal += h.marketValue;
@@ -320,14 +262,11 @@ export default function Insights() {
     { name: 'High Risk (Beta > 1.2)', value: highRiskVal, percentage: (highRiskVal / totalVal) * 100, color: '#ef4444' }
   ].filter(r => r.value > 0);
 
-  // 4. Treemap Data structure (for holdings performance)
   const treemapData = normalizedHoldings.map(h => ({
     name: h.ticker,
     size: h.marketValue,
     unrealized_pnl_pct: h.unrealizedPnlPct
   }));
-
-
 
   return (
     <div className="space-y-8 pb-12">
@@ -336,9 +275,7 @@ export default function Insights() {
         <p className="text-sm text-slate-400">Deep risk analytics, valuation metrics, and asset allocations.</p>
       </div>
 
-      {/* Metrics Cards Grid */}
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-        {/* Weighted Beta */}
         <div className="relative overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/40 p-5 shadow-sm backdrop-blur-md">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Weighted Beta</span>
@@ -354,7 +291,6 @@ export default function Insights() {
           </div>
         </div>
 
-        {/* Weighted P/E Ratio */}
         <div className="relative overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/40 p-5 shadow-sm backdrop-blur-md">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Weighted P/E Ratio</span>
@@ -372,7 +308,6 @@ export default function Insights() {
           </div>
         </div>
 
-        {/* Weighted Dividend Yield */}
         <div className="relative overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/40 p-5 shadow-sm backdrop-blur-md">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Weighted Div Yield</span>
@@ -390,7 +325,6 @@ export default function Insights() {
           </div>
         </div>
 
-        {/* Weighted P/B Ratio */}
         <div className="relative overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/40 p-5 shadow-sm backdrop-blur-md">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Weighted P/B Ratio</span>
@@ -409,7 +343,6 @@ export default function Insights() {
         </div>
       </div>
 
-      {/* Heatmap Section */}
       <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-6 backdrop-blur-md">
         <div className="mb-4">
           <h2 className="text-lg font-bold text-white">Composition Heatmap</h2>
@@ -434,231 +367,55 @@ export default function Insights() {
         </div>
       </div>
 
-      {/* Allocation Breakdown Charts Grid */}
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {/* Sector Allocation */}
-        <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-6 backdrop-blur-md flex flex-col justify-between h-[360px]">
-          <div>
-            <h2 className="text-base font-bold text-white">Sector Allocation</h2>
-            <p className="text-xs text-slate-500">Breakdown of holdings by industry sector</p>
-          </div>
-          <div className="h-48 my-2 relative">
-            {sectorData.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={sectorData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={50}
-                    outerRadius={70}
-                    paddingAngle={2}
-                    dataKey="value"
-                  >
-                    {sectorData.map((_, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip content={<CustomPieTooltip />} />
-                </PieChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="flex items-center justify-center h-full text-slate-500 text-xs">No sector metadata available</div>
-            )}
-          </div>
-          <div className="text-xs text-slate-400 flex items-center justify-center gap-1.5 flex-wrap overflow-y-auto max-h-12">
-            {sectorData.slice(0, 4).map((d, index) => (
-              <span key={d.name} className="inline-flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS[index % COLORS.length] }} />
-                <span>{d.name} ({d.percentage.toFixed(0)}%)</span>
-              </span>
-            ))}
-            {sectorData.length > 4 && <span>+ {sectorData.length - 4} more</span>}
-          </div>
-        </div>
+        <AllocationDonutChart
+          title="Sector Allocation"
+          subtitle="Breakdown of holdings by industry sector"
+          data={sectorData}
+          colors={COLORS}
+        />
 
-        {/* Security Type */}
-        <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-6 backdrop-blur-md flex flex-col justify-between h-[360px]">
-          <div>
-            <h2 className="text-base font-bold text-white">Asset Class Breakdown</h2>
-            <p className="text-xs text-slate-500">Distribution across asset classes &amp; cash</p>
-          </div>
-          <div className="h-48 my-2 relative">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={typeData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={50}
-                  outerRadius={70}
-                  paddingAngle={2}
-                  dataKey="value"
-                >
-                  {typeData.map((_, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[(index + 2) % COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip content={<CustomPieTooltip />} />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-          <div className="text-xs text-slate-400 flex items-center justify-center gap-1.5 flex-wrap">
-            {typeData.map((d, index) => (
-              <span key={d.name} className="inline-flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS[(index + 2) % COLORS.length] }} />
-                <span>{d.name} ({d.percentage.toFixed(0)}%)</span>
-              </span>
-            ))}
-          </div>
-        </div>
+        <AllocationDonutChart
+          title="Asset Class Breakdown"
+          subtitle="Distribution across asset classes & cash"
+          data={typeData}
+          colors={COLORS}
+          colorOffset={2}
+        />
 
-        {/* Region/Country */}
-        <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-6 backdrop-blur-md flex flex-col justify-between h-[360px]">
-          <div>
-            <h2 className="text-base font-bold text-white">Geographic Allocation</h2>
-            <p className="text-xs text-slate-500">Exposures grouped by listing country</p>
-          </div>
-          <div className="h-48 my-2 relative">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={countryData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={50}
-                  outerRadius={70}
-                  paddingAngle={2}
-                  dataKey="value"
-                >
-                  {countryData.map((_, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[(index + 4) % COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip content={<CustomPieTooltip />} />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-          <div className="text-xs text-slate-400 flex items-center justify-center gap-1.5 flex-wrap">
-            {countryData.map((d, index) => (
-              <span key={d.name} className="inline-flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS[(index + 4) % COLORS.length] }} />
-                <span>{d.name} ({d.percentage.toFixed(0)}%)</span>
-              </span>
-            ))}
-          </div>
-        </div>
+        <AllocationDonutChart
+          title="Geographic Allocation"
+          subtitle="Exposures grouped by listing country"
+          data={countryData}
+          colors={COLORS}
+          colorOffset={4}
+        />
 
-        {/* Currency Allocation */}
-        <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-6 backdrop-blur-md flex flex-col justify-between h-[360px]">
-          <div>
-            <h2 className="text-base font-bold text-white">Currency Allocation</h2>
-            <p className="text-xs text-slate-500">Valuation distribution by native currencies</p>
-          </div>
-          <div className="h-48 my-2 relative">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={currencyData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={50}
-                  outerRadius={70}
-                  paddingAngle={2}
-                  dataKey="value"
-                >
-                  {currencyData.map((_, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[(index + 1) % COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip content={<CustomPieTooltip />} />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-          <div className="text-xs text-slate-400 flex items-center justify-center gap-1.5 flex-wrap">
-            {currencyData.map((d, index) => (
-              <span key={d.name} className="inline-flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS[(index + 1) % COLORS.length] }} />
-                <span>{d.name} ({d.percentage.toFixed(0)}%)</span>
-              </span>
-            ))}
-          </div>
-        </div>
+        <AllocationDonutChart
+          title="Currency Allocation"
+          subtitle="Valuation distribution by native currencies"
+          data={currencyData}
+          colors={COLORS}
+          colorOffset={1}
+        />
 
-        {/* Account Allocation */}
-        <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-6 backdrop-blur-md flex flex-col justify-between h-[360px]">
-          <div>
-            <h2 className="text-base font-bold text-white">Account Distribution</h2>
-            <p className="text-xs text-slate-500">Asset value share per brokerage account</p>
-          </div>
-          <div className="h-48 my-2 relative">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={accountData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={50}
-                  outerRadius={70}
-                  paddingAngle={2}
-                  dataKey="value"
-                >
-                  {accountData.map((_, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[(index + 3) % COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip content={<CustomPieTooltip />} />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-          <div className="text-xs text-slate-400 flex items-center justify-center gap-1.5 flex-wrap">
-            {accountData.map((d, index) => (
-              <span key={d.name} className="inline-flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS[(index + 3) % COLORS.length] }} />
-                <span>{d.name} ({d.percentage.toFixed(0)}%)</span>
-              </span>
-            ))}
-          </div>
-        </div>
+        <AllocationDonutChart
+          title="Account Distribution"
+          subtitle="Asset value share per brokerage account"
+          data={accountData}
+          colors={COLORS}
+          colorOffset={3}
+        />
 
-        {/* Risk Profile */}
-        <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-6 backdrop-blur-md flex flex-col justify-between h-[360px]">
-          <div>
-            <h2 className="text-base font-bold text-white">Risk Composition</h2>
-            <p className="text-xs text-slate-500">Allocations categorized by Beta profile</p>
-          </div>
-          <div className="h-48 my-2 relative">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={riskData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={50}
-                  outerRadius={70}
-                  paddingAngle={2}
-                  dataKey="value"
-                >
-                  {riskData.map((d) => (
-                    <Cell key={d.name} fill={d.color} />
-                  ))}
-                </Pie>
-                <Tooltip content={<CustomPieTooltip />} />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-          <div className="text-xs text-slate-400 flex items-center justify-center gap-1.5 flex-wrap">
-            {riskData.map((d) => (
-              <span key={d.name} className="inline-flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full" style={{ backgroundColor: d.color }} />
-                <span>{d.name.split(' (')[0]} ({d.percentage.toFixed(0)}%)</span>
-              </span>
-            ))}
-          </div>
-        </div>
+        <AllocationDonutChart
+          title="Risk Composition"
+          subtitle="Allocations categorized by Beta profile"
+          data={riskData}
+          colors={COLORS}
+          colorOffset={5}
+        />
       </div>
 
-      {/* 52-Week High/Low Ranges */}
       <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-6 backdrop-blur-md">
         <div className="mb-6">
           <h2 className="text-lg font-bold text-white">52-Week High / Low Ranges</h2>
@@ -672,12 +429,11 @@ export default function Insights() {
             {normalizedHoldings.map(h => {
               const has52W = h.fifty_two_week_high && h.fifty_two_week_low && h.fifty_two_week_high > h.fifty_two_week_low;
               
-              // Calculate percentage range position
               let percent = 50;
               const currentPrice = h.marketValue / h.total_shares;
               if (has52W && h.fifty_two_week_low && h.fifty_two_week_high) {
-                const low = convert(h.fifty_two_week_low, h.currency);
-                const high = convert(h.fifty_two_week_high, h.currency);
+                const low = h.fifty_two_week_low;
+                const high = h.fifty_two_week_high;
                 percent = ((currentPrice - low) / (high - low)) * 100;
                 percent = Math.max(0, Math.min(100, percent));
               }
@@ -702,9 +458,9 @@ export default function Insights() {
                           />
                         </div>
                         <div className="flex items-center justify-between text-[10px] text-slate-500">
-                          <span>Low: {formatCurrency(convert(h.fifty_two_week_low, h.currency))}</span>
+                          <span>Low: {formatCurrency(h.fifty_two_week_low)}</span>
                           <span className="text-slate-300 font-medium">{percent.toFixed(0)}% from low</span>
-                          <span>High: {formatCurrency(convert(h.fifty_two_week_high, h.currency))}</span>
+                          <span>High: {formatCurrency(h.fifty_two_week_high)}</span>
                         </div>
                       </>
                     ) : (
