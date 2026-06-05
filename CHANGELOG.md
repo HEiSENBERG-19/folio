@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.2.0] — 2026-06-05
+
+### Added
+- Created `AssetMetadata` SQLModel table to cache security details from `yfinance` with a 24-hour expiration window.
+- Added a `currency` column to the `Account` table supporting both `USD` and `INR` currencies, with automated database migration on application startup.
+- Implemented `/api/v1/portfolio/insights` endpoint in FastAPI backend to fetch cached asset metadata, cash balances, and the `USDINR=X` exchange rate.
+- Added `/insights` page in the React frontend featuring high-fidelity analytics: portfolio-weighted Beta, P/E ratio, Dividend Yield, and P/B ratio.
+- Integrated interactive allocation donut/pie charts for Sector, Country/Region, Security Type, Currency, and Account.
+- Created a custom SVG Treemap Composition Heatmap color-coded by unrealized P&L % (-15% to +15% gradient).
+- Added 52-Week High/Low range sliders for individual holdings.
+- Integrated currency selection dropdown for new account creation on the Transactions page.
+
 ## [v1.1.0] — 2026-06-05
 
 ### Added
