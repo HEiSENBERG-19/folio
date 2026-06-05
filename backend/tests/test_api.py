@@ -71,33 +71,30 @@ def test_full_trade_lifecycle(client):
         assert summary_resp.status_code == 200
         summary = summary_resp.json()
         
-        # Expected remaining: 3 shares of Lot 2 (cost = 160, current = 170)
-        # Total invested = 3 * 160 = 480.00
-        # Total market value = 3 * 170 = 510.00
+        # Expected remaining: 3 shares (cost = 153.33333333333334, current = 170)
+        # Total invested = 460.00
+        # Total market value = 510.00
         # Cash: 10000 - 1500 - 800 + 2040 = 9740.00
         # Net portfolio value: 510 + 9740 = 10250.00
-        # Realized PNL:
-        # Lot 1 (10 shares): cost 150, sell 170 -> PNL = 10 * 20 = 200
-        # Lot 2 (2 shares closed): cost 160, sell 170 -> PNL = 2 * 10 = 20
-        # Total realized PNL = 220
-        # Unrealized PNL: 3 * (170 - 160) = 30
+        # Realized PNL: 200.00
+        # Unrealized PNL: 50.00
         
-        assert summary["total_invested"] == 480.00
-        assert summary["total_market_value"] == 510.00
+        assert pytest.approx(summary["total_invested"]) == 460.00
+        assert pytest.approx(summary["total_market_value"]) == 510.00
         assert summary["total_cash"] == 9740.00
-        assert summary["total_realized_pnl"] == 220.00
-        assert summary["total_unrealized_pnl"] == 30.00
-        assert summary["net_portfolio_value"] == 10250.00
+        assert pytest.approx(summary["total_realized_pnl"]) == 200.00
+        assert pytest.approx(summary["total_unrealized_pnl"]) == 50.00
+        assert pytest.approx(summary["net_portfolio_value"]) == 10250.00
         
         assert len(summary["holdings"]) == 1
         h = summary["holdings"][0]
         assert h["ticker"] == "AAPL"
         assert h["total_shares"] == 3.0
-        assert h["avg_cost_basis"] == 160.0
+        assert pytest.approx(h["avg_cost_basis"]) == 153.33333333333334
         assert h["current_price"] == 170.0
         assert h["market_value"] == 510.0
-        assert h["unrealized_pnl"] == 30.0
-        assert h["realized_pnl"] == 220.0
+        assert pytest.approx(h["unrealized_pnl"]) == 50.0
+        assert pytest.approx(h["realized_pnl"]) == 200.0
 
 
 def test_delete_transaction_replays(client):
@@ -422,13 +419,13 @@ def test_deterministic_scenario_fifo_math(client):
         summary = summary_resp.json()
 
         # Expected:
-        # AAPL: 30 shares remaining (avg_cost_basis = 160.0), market_value = 30 * 175 = 5250.0
+        # AAPL: 30 shares remaining (avg_cost_basis = 153.33333333333334), market_value = 30 * 175 = 5250.0
         # GOOGL: 75 shares remaining (avg_cost_basis = 140.0), market_value = 75 * 145 = 10875.0
-        # Realized PNL: 2200.0
+        # Realized PNL: 2000.0
         # Total cash: 36850.0
         
         assert summary["total_cash"] == 36850.0
-        assert summary["total_realized_pnl"] == 2200.0
+        assert pytest.approx(summary["total_realized_pnl"]) == 2000.0
 
         holdings = summary["holdings"]
         assert len(holdings) == 2
@@ -437,10 +434,10 @@ def test_deterministic_scenario_fifo_math(client):
         googl_h = next(h for h in holdings if h["ticker"] == "GOOGL")
 
         assert aapl_h["total_shares"] == 30.0
-        assert aapl_h["avg_cost_basis"] == 160.0
+        assert pytest.approx(aapl_h["avg_cost_basis"]) == 153.33333333333334
         assert aapl_h["current_price"] == 175.0
         assert aapl_h["market_value"] == 5250.0
-        assert aapl_h["realized_pnl"] == 2200.0
+        assert pytest.approx(aapl_h["realized_pnl"]) == 2000.0
 
         assert googl_h["total_shares"] == 75.0
         assert googl_h["avg_cost_basis"] == 140.0

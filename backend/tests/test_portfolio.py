@@ -4,7 +4,7 @@ from unittest.mock import patch, MagicMock
 import pandas as pd
 from sqlmodel import Session, select
 
-from app.models import Account, Asset, Transaction, FIFOLot, PriceCache, TxType
+from app.models import Account, Asset, Transaction, Holding, PriceCache, TxType
 from app.services.price_service import fetch_and_cache_prices, build_price_matrix
 from app.services.portfolio import get_portfolio_summary, get_portfolio_history, get_portfolio_allocation
 
@@ -119,19 +119,17 @@ def test_unrealized_pnl_calculation(mock_download, mock_get_current_prices, sess
     session.add(tx)
     session.flush()
 
-    # Adjust cash balance and lot
+    # Adjust cash balance and holding
     account.cash_balance -= 1500.0
     session.add(account)
-    lot = FIFOLot(
+    holding = Holding(
         account_id=account.id,
         asset_id=asset.id,
-        open_transaction_id=tx.id,
-        quantity_purchased=10.0,
-        quantity_remaining=10.0,
-        cost_per_unit=150.0,
-        opened_at=tx.executed_at
+        total_shares=10.0,
+        total_cost=1500.0,
+        realized_pnl=0.0
     )
-    session.add(lot)
+    session.add(holding)
     session.commit()
 
     # Mock current price of AAPL to be 170
@@ -193,16 +191,14 @@ def test_portfolio_history_shape(mock_build_matrix, session: Session):
     session.add(account)
 
 
-    lot = FIFOLot(
+    holding = Holding(
         account_id=account.id,
         asset_id=asset.id,
-        open_transaction_id=tx_buy.id,
-        quantity_purchased=2.0,
-        quantity_remaining=2.0,
-        cost_per_unit=100.0,
-        opened_at=day3_datetime
+        total_shares=2.0,
+        total_cost=200.0,
+        realized_pnl=0.0
     )
-    session.add(lot)
+    session.add(holding)
     session.commit()
 
     # Mock price matrix for AAPL for the past 30 days
@@ -260,16 +256,14 @@ def test_portfolio_allocation(mock_get_prices, session: Session):
     )
     session.add(tx1)
     session.flush()
-    lot1 = FIFOLot(
+    holding1 = Holding(
         account_id=account.id,
         asset_id=asset.id,
-        open_transaction_id=tx1.id,
-        quantity_purchased=10.0,
-        quantity_remaining=10.0,
-        cost_per_unit=150.0,
-        opened_at=tx1.executed_at
+        total_shares=10.0,
+        total_cost=1500.0,
+        realized_pnl=0.0
     )
-    session.add(lot1)
+    session.add(holding1)
 
     # MSFT lot: cost 2000, current price 3400 (10 shares at 200/340)
     tx2 = Transaction(
@@ -283,16 +277,14 @@ def test_portfolio_allocation(mock_get_prices, session: Session):
     )
     session.add(tx2)
     session.flush()
-    lot2 = FIFOLot(
+    holding2 = Holding(
         account_id=account.id,
         asset_id=asset2.id,
-        open_transaction_id=tx2.id,
-        quantity_purchased=10.0,
-        quantity_remaining=10.0,
-        cost_per_unit=200.0,
-        opened_at=tx2.executed_at
+        total_shares=10.0,
+        total_cost=2000.0,
+        realized_pnl=0.0
     )
-    session.add(lot2)
+    session.add(holding2)
     session.commit()
 
     mock_get_prices.return_value = {"AAPL": 170.0, "MSFT": 340.0}
@@ -393,22 +385,6 @@ def test_api_portfolio_history(mock_build_matrix, client):
     assert invalid_resp.status_code == 400
 
 
-@patch("yfinance.Ticker")
-def test_get_usd_inr_rate(mock_ticker):
-    mock_instance = MagicMock()
-    mock_instance.fast_info.get.return_value = 84.2
-    mock_ticker.return_value = mock_instance
-    
-    from app.services.portfolio import get_usd_inr_rate
-    rate = get_usd_inr_rate()
-    assert rate == 84.2
-
-    # Offline/fallback case
-    mock_instance.fast_info.get.side_effect = Exception("offline")
-    mock_instance.history.return_value = MagicMock(empty=True)
-    rate = get_usd_inr_rate()
-    assert rate == 83.5
-
 
 @patch("yfinance.Ticker")
 def test_fetch_and_cache_metadata(mock_ticker, session: Session):
@@ -447,10 +423,9 @@ def test_fetch_and_cache_metadata(mock_ticker, session: Session):
     assert db_meta.sector == "Technology"
 
 
-@patch("app.services.portfolio.get_usd_inr_rate")
 @patch("app.services.portfolio.fetch_and_cache_metadata")
 @patch("app.services.price_service.get_current_prices")
-def test_api_portfolio_insights(mock_get_current_prices, mock_fetch_meta, mock_get_rate, client, session: Session):
+def test_api_portfolio_insights(mock_get_current_prices, mock_fetch_meta, client, session: Session):
     # Setup account and asset
     acc_resp = client.post("/api/v1/accounts", json={"name": "Insights Account", "currency": "INR"})
     account_id = acc_resp.json()["id"]
@@ -476,7 +451,6 @@ def test_api_portfolio_insights(mock_get_current_prices, mock_fetch_meta, mock_g
         "executed_at": "2026-06-02T10:00:00Z"
     })
 
-    mock_get_rate.return_value = 80.0
     mock_get_current_prices.return_value = {"AAPL": 13000.0}
     
     from app.models import AssetMetadata
@@ -496,7 +470,6 @@ def test_api_portfolio_insights(mock_get_current_prices, mock_fetch_meta, mock_g
     resp = client.get("/api/v1/portfolio/insights")
     assert resp.status_code == 200
     data = resp.json()
-    assert data["usd_inr_rate"] == 80.0
     assert len(data["holdings"]) == 1
     assert data["holdings"][0]["ticker"] == "AAPL"
     assert data["holdings"][0]["currency"] == "INR"
