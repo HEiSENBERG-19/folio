@@ -1,6 +1,6 @@
 from sqlmodel import Session, select
 import yfinance as yf
-from app.models import Asset, FIFOLot, LotClosure, Account, Transaction, TxType, AssetMetadata
+from app.models import Asset, Holding, Account, Transaction, TxType, AssetMetadata
 from app.schemas import (
     HoldingDetail,
     PortfolioSummary,
@@ -16,29 +16,23 @@ from datetime import date, datetime, timezone, timedelta
 
 
 def get_portfolio_summary(session: Session) -> PortfolioSummary:
-    # 1. Fetch all assets
     assets = session.exec(select(Asset)).all()
+    asset_map = {a.id: a for a in assets}
 
-    # 2. Get all open lots (where quantity_remaining > 0)
-    open_lots = session.exec(
-        select(FIFOLot)
-        .where(FIFOLot.quantity_remaining > 0)
+    # Get all holdings with shares > 0
+    holdings_db = session.exec(
+        select(Holding).where(Holding.total_shares > 0)
     ).all()
 
-    # Group open lots by asset_id
-    lots_by_asset = {}
-    for lot in open_lots:
-        lots_by_asset.setdefault(lot.asset_id, []).append(lot)
+    # Group by asset_id (merge holdings across accounts)
+    asset_holdings: dict[int, list[Holding]] = {}
+    for h in holdings_db:
+        asset_holdings.setdefault(h.asset_id, []).append(h)
 
-    # Get active tickers
-    active_tickers = []
-    active_assets = []
-    for asset in assets:
-        if asset.id in lots_by_asset:
-            active_tickers.append(asset.ticker)
-            active_assets.append(asset)
+    # Get active tickers for price fetch
+    active_assets = [asset_map[aid] for aid in asset_holdings if aid in asset_map]
+    active_tickers = [a.ticker for a in active_assets]
 
-    # 3. Fetch current prices
     current_prices = {}
     if active_tickers:
         current_prices = price_service.get_current_prices(session, active_tickers)
@@ -48,9 +42,9 @@ def get_portfolio_summary(session: Session) -> PortfolioSummary:
     total_market_value = 0.0
 
     for asset in active_assets:
-        lots = lots_by_asset[asset.id]
-        total_shares = sum(lot.quantity_remaining for lot in lots)
-        total_cost = sum(lot.quantity_remaining * lot.cost_per_unit for lot in lots)
+        h_list = asset_holdings[asset.id]
+        total_shares = sum(h.total_shares for h in h_list)
+        total_cost = sum(h.total_cost for h in h_list)
         avg_cost_basis = total_cost / total_shares if total_shares > 0 else 0.0
 
         current_price = current_prices.get(asset.ticker, 0.0)
@@ -58,34 +52,27 @@ def get_portfolio_summary(session: Session) -> PortfolioSummary:
         unrealized_pnl = market_value - total_cost
         unrealized_pnl_pct = (unrealized_pnl / total_cost * 100.0) if total_cost > 0 else 0.0
 
-        # Realized PNL for this asset
-        closures = session.exec(
-            select(LotClosure)
-            .join(FIFOLot)
-            .where(FIFOLot.asset_id == asset.id)
-        ).all()
-        realized_pnl = sum(c.realized_pnl for c in closures)
+        # Realized PNL for this asset (sum across accounts)
+        realized_pnl = sum(h.realized_pnl for h in h_list)
 
-        holdings.append(
-            HoldingDetail(
-                ticker=asset.ticker,
-                asset_name=asset.name,
-                total_shares=total_shares,
-                avg_cost_basis=avg_cost_basis,
-                current_price=current_price,
-                market_value=market_value,
-                unrealized_pnl=unrealized_pnl,
-                unrealized_pnl_pct=unrealized_pnl_pct,
-                realized_pnl=realized_pnl
-            )
-        )
+        holdings.append(HoldingDetail(
+            ticker=asset.ticker,
+            asset_name=asset.name,
+            total_shares=total_shares,
+            avg_cost_basis=avg_cost_basis,
+            current_price=current_price,
+            market_value=market_value,
+            unrealized_pnl=unrealized_pnl,
+            unrealized_pnl_pct=unrealized_pnl_pct,
+            realized_pnl=realized_pnl,
+        ))
 
         total_invested += total_cost
         total_market_value += market_value
 
-    # Total realized PNL across all closed lots in the system
-    all_closures = session.exec(select(LotClosure)).all()
-    total_realized_pnl = sum(c.realized_pnl for c in all_closures)
+    # Total realized PNL
+    all_holdings = session.exec(select(Holding)).all()
+    total_realized_pnl = sum(h.realized_pnl for h in all_holdings)
 
     # Total cash
     accounts = session.exec(select(Account)).all()
@@ -101,7 +88,7 @@ def get_portfolio_summary(session: Session) -> PortfolioSummary:
         total_realized_pnl=total_realized_pnl,
         total_unrealized_pnl=total_unrealized_pnl,
         net_portfolio_value=net_portfolio_value,
-        holdings=holdings
+        holdings=holdings,
     )
 
 
@@ -235,20 +222,6 @@ def get_portfolio_allocation(session: Session) -> list[AllocationSlice]:
     return slices
 
 
-def get_usd_inr_rate() -> float:
-    try:
-        ticker = yf.Ticker("USDINR=X")
-        price = ticker.fast_info.get("lastPrice", None)
-        if price is None:
-            hist = ticker.history(period="1d")
-            if not hist.empty:
-                price = float(hist['Close'].iloc[-1])
-        if price is not None:
-            return float(price)
-    except Exception:
-        pass
-    return 83.5 # Standard fallback
-
 
 def fetch_and_cache_metadata(session: Session, asset: Asset) -> AssetMetadata:
     metadata = session.exec(select(AssetMetadata).where(AssetMetadata.asset_id == asset.id)).first()
@@ -331,7 +304,6 @@ def fetch_and_cache_metadata(session: Session, asset: Asset) -> AssetMetadata:
 
 def get_portfolio_insights(session: Session) -> PortfolioInsights:
     summary = get_portfolio_summary(session)
-    usd_inr_rate = get_usd_inr_rate()
     
     # Pre-fetch and cache metadata for all active assets
     assets = session.exec(select(Asset)).all()
@@ -369,14 +341,14 @@ def get_portfolio_insights(session: Session) -> PortfolioInsights:
             price_map[h.ticker] = h.current_price
             
     # Calculate stock value per account
-    open_lots = session.exec(select(FIFOLot).where(FIFOLot.quantity_remaining > 0)).all()
-    account_stock_val = {}
-    for lot in open_lots:
-        asset = asset_id_map.get(lot.asset_id)
+    holdings_db = session.exec(select(Holding).where(Holding.total_shares > 0)).all()
+    account_stock_val: dict[int, float] = {}
+    for h in holdings_db:
+        asset = asset_id_map.get(h.asset_id)
         if asset:
             price = price_map.get(asset.ticker, 0.0)
-            val = lot.quantity_remaining * price
-            account_stock_val[lot.account_id] = account_stock_val.get(lot.account_id, 0.0) + val
+            val = h.total_shares * price
+            account_stock_val[h.account_id] = account_stock_val.get(h.account_id, 0.0) + val
 
     # Fetch accounts & cash
     accounts = session.exec(select(Account)).all()
@@ -393,7 +365,6 @@ def get_portfolio_insights(session: Session) -> PortfolioInsights:
     
     return PortfolioInsights(
         holdings=holdings_insights,
-        cash_balances=cash_details,
-        usd_inr_rate=usd_inr_rate
+        cash_balances=cash_details
     )
 
