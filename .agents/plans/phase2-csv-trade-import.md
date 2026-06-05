@@ -6,13 +6,13 @@ created: 2026-06-05
 updated: 2026-06-05
 depends_on: phase1-architecture-cleanup
 progress:
-  - "[ ] Task 1: Create CSV parsing service with row validation"
-  - "[ ] Task 2: Create import orchestrator service"
-  - "[ ] Task 3: Add POST /api/v1/transactions/import endpoint"
-  - "[ ] Task 4: Add backend tests for CSV import"
-  - "[ ] Task 5: Add frontend types and hook for CSV import"
-  - "[ ] Task 6: Add CSV upload UI to Transactions page"
-  - "[ ] Task 7: End-to-end manual QA with sample CSV"
+  - "[x] Task 1: Create CSV parsing service with row validation"
+  - "[x] Task 2: Create import orchestrator service"
+  - "[x] Task 3: Add POST /api/v1/transactions/import endpoint"
+  - "[x] Task 4: Add backend tests for CSV import"
+  - "[x] Task 5: Add frontend types and hook for CSV import"
+  - "[x] Task 6: Add CSV upload UI to Transactions page"
+  - "[x] Task 7: End-to-end manual QA with sample CSV"
 ---
 
 # Phase 2: CSV Trade Import

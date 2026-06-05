@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, UploadFile, File
 from sqlmodel import Session, select
 from typing import Optional
 
@@ -6,6 +6,7 @@ from app.database import get_session
 from app.models import Transaction, Account, Asset, TxType
 from app.schemas import TransactionCreate
 from app.services.transaction_service import process_transaction, replay_account_holdings
+from app.services.csv_import import parse_csv, import_transactions
 
 router = APIRouter(prefix="/transactions", tags=["transactions"])
 
@@ -70,6 +71,65 @@ def create_transaction(payload: TransactionCreate, session: Session = Depends(ge
 
     session.refresh(tx)
     return tx
+
+
+@router.post("/import")
+async def import_csv_endpoint(
+    file: UploadFile = File(...),
+    session: Session = Depends(get_session),
+):
+    """Import transactions from a CSV file.
+
+    Expected columns: Account, Ticker, Action, Quantity, Price, Date
+    Optional: Amount (defaults to Quantity × Price)
+
+    Auto-creates missing accounts (INR) and assets.
+    Skips duplicate rows. Reports errors per-row.
+    """
+    # Validate file type
+    if not file.filename or not file.filename.lower().endswith('.csv'):
+        raise HTTPException(status_code=400, detail="File must be a .csv file")
+
+    # Read content
+    content = await file.read()
+    try:
+        text = content.decode('utf-8')
+    except UnicodeDecodeError:
+        raise HTTPException(status_code=400, detail="File must be UTF-8 encoded")
+
+    # Parse
+    parsed_rows, parse_errors = parse_csv(text)
+
+    if parse_errors and not parsed_rows:
+        # All rows failed parsing or header error
+        return {
+            "total_rows": 0,
+            "imported_count": 0,
+            "skipped_count": 0,
+            "errors": [{"row": e.row, "message": e.message} for e in parse_errors],
+            "created_accounts": [],
+            "created_assets": [],
+        }
+
+    # Import valid rows
+    try:
+        result = import_transactions(session, parsed_rows)
+    except Exception as e:
+        session.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+    # Merge parse errors + import errors
+    all_errors = [{"row": e.row, "message": e.message} for e in parse_errors]
+    all_errors += [{"row": e.row, "message": e.message} for e in result.errors]
+
+    return {
+        "total_rows": len(parsed_rows) + len(parse_errors),
+        "imported_count": result.imported_count,
+        "skipped_count": result.skipped_count,
+        "errors": all_errors,
+        "created_accounts": result.created_accounts,
+        "created_assets": result.created_assets,
+    }
 
 
 @router.get("/{transaction_id}", response_model=Transaction)

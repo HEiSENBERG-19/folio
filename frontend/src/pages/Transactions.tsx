@@ -1,10 +1,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState } from 'react';
-import { Plus, Search, Trash2, X, AlertTriangle } from 'lucide-react';
-import { useTransactions, useCreateTransaction, useDeleteTransaction } from '../hooks/useTransactions';
+import { Plus, Search, Trash2, X, AlertTriangle, Upload } from 'lucide-react';
+import { useTransactions, useCreateTransaction, useDeleteTransaction, useImportCsv } from '../hooks/useTransactions';
 import { useAccounts, useCreateAccount } from '../hooks/useAccounts';
 import { useAssets, useCreateAsset } from '../hooks/useAssets';
-import type { TxType } from '../types';
+import type { TxType, CsvImportResult } from '../types';
 import { useCurrency } from '../context/CurrencyContext';
 
 const getLocalDatetimeString = () => {
@@ -36,6 +36,9 @@ export default function Transactions() {
 
   // Modal and toast state
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importResult, setImportResult] = useState<CsvImportResult | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   // Form fields state
@@ -67,6 +70,7 @@ export default function Transactions() {
   const deleteTransaction = useDeleteTransaction();
   const createAccount = useCreateAccount();
   const createAsset = useCreateAsset();
+  const importCsv = useImportCsv();
 
   const showToast = (message: string, type: 'success' | 'error') => {
     setToast({ message, type });
@@ -254,18 +258,27 @@ export default function Transactions() {
           <h1 className="text-3xl font-bold tracking-tight text-white">Transactions</h1>
           <p className="text-sm text-slate-400">Add, track, and manage your account transactions.</p>
         </div>
-        <button
-          onClick={() => {
-            if (accounts && accounts.length > 0 && !formAccountId) {
-              setFormAccountId(String(accounts[0].id));
-            }
-            setIsModalOpen(true);
-          }}
-          className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 font-semibold text-sm rounded-xl hover:opacity-90 shadow-lg hover:shadow-emerald-500/10 transition-all duration-200 cursor-pointer"
-        >
-          <Plus className="h-5 w-5 stroke-[2.5]" />
-          Add Trade
-        </button>
+        <div className="flex gap-3">
+          <button
+            onClick={() => setIsImportModalOpen(true)}
+            className="inline-flex items-center gap-2 px-4 py-2.5 bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-300 font-semibold text-sm rounded-xl transition-all duration-200 cursor-pointer hover:bg-slate-800/80"
+          >
+            <Upload className="h-5 w-5" />
+            Import CSV
+          </button>
+          <button
+            onClick={() => {
+              if (accounts && accounts.length > 0 && !formAccountId) {
+                setFormAccountId(String(accounts[0].id));
+              }
+              setIsModalOpen(true);
+            }}
+            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 font-semibold text-sm rounded-xl hover:opacity-90 shadow-lg hover:shadow-emerald-500/10 transition-all duration-200 cursor-pointer"
+          >
+            <Plus className="h-5 w-5 stroke-[2.5]" />
+            Add Trade
+          </button>
+        </div>
       </div>
 
       {/* Filters and Search Bar */}
@@ -628,6 +641,145 @@ export default function Transactions() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* CSV Import Modal */}
+      {isImportModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-5">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <h2 className="text-xl font-bold text-white">Import CSV</h2>
+              <button
+                onClick={() => {
+                  setIsImportModalOpen(false);
+                  setImportFile(null);
+                  setImportResult(null);
+                }}
+                className="text-slate-400 hover:text-slate-200 cursor-pointer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* BEFORE import: file picker */}
+            {!importResult ? (
+              <div className="space-y-4">
+                <p className="text-sm text-slate-400">
+                  Upload a CSV with columns:{' '}
+                  <span className="text-slate-300 font-medium">Account, Ticker, Action, Quantity, Price, Date</span>.
+                  Optional: <span className="text-slate-300 font-medium">Amount</span>.
+                </p>
+
+                {/* Drop zone / file input */}
+                <label className="flex flex-col items-center justify-center h-32 border-2 border-dashed border-slate-800 hover:border-slate-700 rounded-xl cursor-pointer bg-slate-950/50 transition-colors">
+                  <Upload className="h-8 w-8 text-slate-600 mb-2" />
+                  <span className="text-sm text-slate-500">
+                    {importFile ? importFile.name : 'Click to select CSV file'}
+                  </span>
+                  <input
+                    type="file"
+                    accept=".csv"
+                    className="hidden"
+                    onChange={(e) => setImportFile(e.target.files?.[0] || null)}
+                  />
+                </label>
+
+                <div className="flex gap-3 justify-end pt-2">
+                  <button
+                    onClick={() => {
+                      setIsImportModalOpen(false);
+                      setImportFile(null);
+                    }}
+                    className="px-5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm font-semibold text-slate-400 cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    disabled={!importFile || importCsv.isPending}
+                    onClick={() => {
+                      if (importFile) {
+                        importCsv.mutate(importFile, {
+                          onSuccess: (data) => setImportResult(data),
+                          onError: (err: any) => {
+                            const errMsg = err.response?.data?.detail || err.message || 'Failed to import CSV';
+                            showToast(errMsg, 'error');
+                          },
+                        });
+                      }
+                    }}
+                    className="px-5 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 font-bold text-sm rounded-xl cursor-pointer disabled:opacity-55"
+                  >
+                    {importCsv.isPending ? 'Importing...' : 'Import'}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              /* AFTER import: results summary */
+              <div className="space-y-4">
+                {/* Success count */}
+                <div className="flex items-center gap-3 p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl">
+                  <span className="text-2xl font-bold text-emerald-400">{importResult.imported_count}</span>
+                  <span className="text-sm text-emerald-300">transactions imported</span>
+                </div>
+
+                {/* Skipped */}
+                {importResult.skipped_count > 0 && (
+                  <div className="flex items-center gap-3 p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl">
+                    <span className="text-lg font-bold text-blue-400">{importResult.skipped_count}</span>
+                    <span className="text-sm text-blue-300">duplicates skipped</span>
+                  </div>
+                )}
+
+                {/* Auto-created entities */}
+                {importResult.created_accounts.length > 0 && (
+                  <div className="text-xs text-slate-400">
+                    <span className="font-medium text-slate-300">Accounts created: </span>
+                    {importResult.created_accounts.join(', ')}
+                  </div>
+                )}
+                {importResult.created_assets.length > 0 && (
+                  <div className="text-xs text-slate-400">
+                    <span className="font-medium text-slate-300">Assets registered: </span>
+                    {importResult.created_assets.join(', ')}
+                  </div>
+                )}
+
+                {/* Errors */}
+                {importResult.errors.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-xs font-semibold text-red-400 uppercase tracking-wider">
+                      Errors ({importResult.errors.length})
+                    </p>
+                    <div className="max-h-40 overflow-y-auto space-y-1">
+                      {importResult.errors.map((err, i) => (
+                        <div
+                          key={i}
+                          className="text-xs text-red-300 bg-red-500/5 border border-red-500/10 px-3 py-1.5 rounded-lg"
+                        >
+                          Row {err.row}: {err.message}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex justify-end pt-2">
+                  <button
+                    onClick={() => {
+                      setIsImportModalOpen(false);
+                      setImportFile(null);
+                      setImportResult(null);
+                    }}
+                    className="px-5 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 font-bold text-sm rounded-xl cursor-pointer"
+                  >
+                    Done
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
