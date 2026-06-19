@@ -23,7 +23,7 @@ Add a CSV upload endpoint that parses a trade history file, validates all rows, 
 
 ## Motivation
 
-Manually entering 15+ historical transactions is tedious. The user has a CSV export ([trades_with_amount.csv](file:///home/heisenberg/projects/folio/docs/trades_with_amount.csv)) with this format:
+Manually entering 15+ historical transactions is tedious. The user has a CSV export ([trades_with_amount.csv](../../docs/trades_with_amount.csv)) with this format:
 
 ```
 Account,Ticker,Action,Quantity,Price,Date,Amount

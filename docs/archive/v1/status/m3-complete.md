@@ -9,27 +9,27 @@
 ## Tasks Completed
 
 ### 3.1 — Price Service
-- Created [price_service.py](file:///home/heisenberg/projects/folio/backend/app/services/price_service.py) with the following operations:
+- Created [price_service.py](../../../../backend/app/services/price_service.py) with the following operations:
   - `fetch_and_cache_prices(session, ticker, start_date, end_date)`: Resolves missing price date gaps in `PriceCache` by fetching contiguous missing ranges from yfinance and committing them. Gracefully catches exceptions, returning cached fallback values.
   - `get_current_prices(session, tickers)`: Queries current real-time prices using `fast_info['lastPrice']` or `history('1d')` from yfinance, falling back to the latest price cached in the database.
   - `build_price_matrix(session, tickers, start_date, end_date)`: Generates daily prices dictionary for all calendar dates in the period, utilizing Pandas to reindex and forward-fill weekend/holiday market closures (along with backward-filling `bfill` for start-of-period gaps).
 
 ### 3.2 — Portfolio Service
-- Created [portfolio.py](file:///home/heisenberg/projects/folio/backend/app/services/portfolio.py) with portfolio calculators:
+- Created [portfolio.py](../../../../backend/app/services/portfolio.py) with portfolio calculators:
   - `get_portfolio_summary(session)`: Computes aggregate shares, weighted average cost basis (`avg_cost_basis`), market values, unrealized P&L, and unrealized P&L percentages for all active holdings. Includes total invested capital, market value, cash balance across accounts, realized P&L from lot closures, and net portfolio value.
   - `get_portfolio_history(session, period)`: Parses the period (1M, 3M, 6M, 1Y, ALL), tracks chronological transaction events to construct daily state snapshots of stock holdings and cash balance, and combines them with the daily price matrix to calculate historical values.
   - `get_portfolio_allocation(session)`: Calculates holdings' current market values and return percentage shares of the total portfolio stock value.
 
 ### 3.3 — Portfolio API Router
-- Added response schemas to [schemas.py](file:///home/heisenberg/projects/folio/backend/app/schemas.py): `HoldingDetail`, `PortfolioSummary`, `PortfolioHistoryPoint`, `PortfolioHistory`, and `AllocationSlice`.
-- Created [portfolio.py](file:///home/heisenberg/projects/folio/backend/app/routers/portfolio.py) exposing API endpoints:
+- Added response schemas to [schemas.py](../../../../backend/app/schemas.py): `HoldingDetail`, `PortfolioSummary`, `PortfolioHistoryPoint`, `PortfolioHistory`, and `AllocationSlice`.
+- Created [portfolio.py](../../../../backend/app/routers/portfolio.py) exposing API endpoints:
   - `GET /portfolio/summary`
   - `GET /portfolio/history?period=1Y` (validating period parameters)
   - `GET /portfolio/allocation`
-- Registered the router on the FastAPI application in [main.py](file:///home/heisenberg/projects/folio/backend/app/main.py).
+- Registered the router on the FastAPI application in [main.py](../../../../backend/app/main.py).
 
 ### 3.4 — pytest Suite for Pricing/Portfolio
-- Created [test_portfolio.py](file:///home/heisenberg/projects/folio/backend/tests/test_portfolio.py) to test pricing and portfolio logic:
+- Created [test_portfolio.py](../../../../backend/tests/test_portfolio.py) to test pricing and portfolio logic:
   - `test_price_cache_stores_fetched_data`
   - `test_price_cache_avoids_refetch`
   - `test_forward_fill_weekends`
@@ -64,12 +64,12 @@ All manual checks passed:
 ## Files Created/Modified
 
 - **Modified:**
-  - [AGENTS.md](file:///home/heisenberg/projects/folio/AGENTS.md)
-  - [CHANGELOG.md](file:///home/heisenberg/projects/folio/CHANGELOG.md)
-  - [backend/app/main.py](file:///home/heisenberg/projects/folio/backend/app/main.py)
-  - [backend/app/schemas.py](file:///home/heisenberg/projects/folio/backend/app/schemas.py)
+  - [AGENTS.md](../../../../AGENTS.md)
+  - [CHANGELOG.md](../../../../CHANGELOG.md)
+  - [backend/app/main.py](../../../../backend/app/main.py)
+  - [backend/app/schemas.py](../../../../backend/app/schemas.py)
 - **Created:**
-  - [backend/app/services/price_service.py](file:///home/heisenberg/projects/folio/backend/app/services/price_service.py)
-  - [backend/app/services/portfolio.py](file:///home/heisenberg/projects/folio/backend/app/services/portfolio.py)
-  - [backend/app/routers/portfolio.py](file:///home/heisenberg/projects/folio/backend/app/routers/portfolio.py)
-  - [backend/tests/test_portfolio.py](file:///home/heisenberg/projects/folio/backend/tests/test_portfolio.py)
+  - [backend/app/services/price_service.py](../../../../backend/app/services/price_service.py)
+  - [backend/app/services/portfolio.py](../../../../backend/app/services/portfolio.py)
+  - [backend/app/routers/portfolio.py](../../../../backend/app/routers/portfolio.py)
+  - [backend/tests/test_portfolio.py](../../../../backend/tests/test_portfolio.py)

@@ -52,8 +52,8 @@
 ## Files Created/Modified
 
 - **Modified:**
-  - [AGENTS.md](file:///home/heisenberg/projects/folio/AGENTS.md)
-  - [CHANGELOG.md](file:///home/heisenberg/projects/folio/CHANGELOG.md)
+  - [AGENTS.md](../../../../AGENTS.md)
+  - [CHANGELOG.md](../../../../CHANGELOG.md)
 - **Created:**
-  - [backend/tests/test_api.py](file:///home/heisenberg/projects/folio/backend/tests/test_api.py)
-  - [docs/status/m6-complete.md](file:///home/heisenberg/projects/folio/docs/status/m6-complete.md)
+  - [backend/tests/test_api.py](../../../../backend/tests/test_api.py)
+  - [docs/status/m6-complete.md](../../../status/m6-complete.md)
