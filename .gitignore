@@ -43,3 +43,23 @@ docs/trades_with_amount.csv
 *.njsproj
 *.sln
 *.swp
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+.env.development
+.env.test
+.env.production
+
+# Logs
+*.log
+logs/
+
+# Linters
+.eslintcache
+
+# Python packaging/build
+build/
+*.egg-info/
+
