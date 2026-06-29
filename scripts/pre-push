@@ -18,10 +18,12 @@ else
     echo "  ▸ Backend: .venv not found, skipping pytest"
 fi
 
-# --- Frontend type check + build ---
+# --- Frontend type check + unit tests + build ---
 if [ -d "frontend/node_modules" ]; then
     echo "  ▸ Frontend: type check (tsc --noEmit)"
     cd frontend && npx tsc --noEmit
+    echo "  ▸ Frontend: vitest"
+    npx vitest run --reporter=dot
     echo "  ▸ Frontend: build"
     npm run build --silent
     cd ..

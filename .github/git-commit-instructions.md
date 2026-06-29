@@ -31,7 +31,7 @@ Use [Conventional Commits](https://www.conventionalcommits.org/):
 
 Use the module or feature area:
 
-`accounts`, `assets`, `transactions`, `portfolio`, `fifo`, `ui`, `api`, `db`, `deps`, `build`
+`accounts`, `assets`, `transactions`, `portfolio`, `ui`, `api`, `db`, `deps`, `build`
 
 ## Rules
 
@@ -46,7 +46,7 @@ Use the module or feature area:
 
 ```
 feat(portfolio): add unrealized P&L breakdown by asset
-fix(fifo): handle zero-quantity lot edge case in sell matching
+fix(portfolio): handle zero-quantity holding edge case in sell processing
 docs(readme): update build instructions for development setup
 test(transactions): add edge case tests for withdrawal validation
 chore(deps): bump FastAPI to 0.115.0

@@ -1,113 +1,95 @@
-# Folio — Agent Workflow Guide
+# Folio — Workflow Guide
 
-This guide explains how to use the multi-agent development workflow for Folio.
+This guide explains how to use the skill-based development workflow for Folio.
 
-## Overview
+## Quick Start
 
-Folio uses a 4-agent workflow where each agent has a specific role:
-
-| Agent | Role | Artifacts |
-|-------|------|-----------|
-| **Planning Agent** | Writes feature specifications | `.agents/plans/*.md` |
-| **Developer Agent** | Implements from approved plans | Feature branches |
-| **QA Agent** | Verifies features against specs | `.agents/reports/*.md` |
-| **Git Agent** | Commits, merges, releases | Changelog, tags |
-
-## Workflow Cycle
+### Plan a Feature (use Opus)
+> Switch to Opus: `/model claude-opus-4-6`
 
 ```
-  You → Planning Agent → You (approve) → Developer Agent → QA Agent
-                                                              ↓
-                                              FAIL → Developer Agent (fix)
-                                              PASS → You (review) → Git Agent → ✅ Done
+Read .agents/skills/plan/SKILL.md and plan this feature: <describe your feature>
 ```
 
-## Step-by-Step
+### Implement the Plan (use Flash)
+> Switch to Flash: `/model gemini-2.5-flash`
+
+```
+Read .agents/skills/develop/SKILL.md and implement .agents/plans/<name>.md
+```
+
+### Standalone QA (use Flash)
+```
+Read .agents/skills/verify/SKILL.md and verify the current state
+```
+
+## Workflow Lifecycle
+
+```
+Plan (Opus) → You approve → Implement + Verify + Commit (Flash) → You push
+```
+
+Everything happens in a single session. The agent pauses for your approval at defined gates:
+1. After writing the plan (you review and approve)
+2. After committing (you push manually)
+
+## Detailed Steps
 
 ### Step 1: Plan
-
-Open a new AI chat session and say:
-
-> You are the Planning Agent. Read `.agents/agents/planning.agent.md` for your instructions.
->
-> Feature request: *<describe what you want>*
->
-> Write a plan to `.agents/plans/<feature-name>.md`
-
-The agent will research the codebase and produce a detailed specification.
+Tell the agent to read the planning skill and describe the feature. It will:
+- Research the codebase
+- Check for conflicting plans
+- Write a spec to `.agents/plans/<feature-name>.md`
+- **STOP** and wait for your approval
 
 ### Step 2: Approve
-
-Review the generated plan. Ask questions, request changes, or approve:
-
+Review the plan. Ask questions, request changes, or approve:
 > Plan approved. Update status to Approved.
 
-### Step 3: Develop
+### Step 3: Implement
+Tell the agent to read the develop skill and implement the plan. It will:
+- Create a feature branch
+- Implement backend and/or frontend changes
+- Write tests (pytest, Vitest, Playwright)
+- Run `scripts/verify.sh` (hard gate — must pass)
+- Auto-fix failures (up to 3 attempts)
+- Squash commit with conventional format
+- Merge to main via `--no-ff`
+- **STOP** before pushing
 
-Open a **new** AI chat session and say:
-
-> You are the Developer Agent. Read `.agents/agents/developer.agent.md` for your instructions.
->
-> Implement the approved plan at `.agents/plans/<feature-name>.md`
-
-The agent will create a feature branch, implement the changes, write tests, and verify builds.
-
-### Step 4: QA
-
-Open a **new** AI chat session and say:
-
-> You are the QA Agent. Read `.agents/agents/qa.agent.md` for your instructions.
->
-> Verify the feature branch `feature/<name>` against the plan at `.agents/plans/<feature-name>.md`
-
-The agent will run tests, check acceptance criteria, and produce a report.
-
-### Step 5: Fix (if needed)
-
-If QA fails, go back to the Developer Agent session:
-
-> QA found issues. See `.agents/reports/<feature-name>-qa.md`. Fix them.
-
-### Step 6: Release
-
-After you manually verify and QA passes:
-
-> You are the Git Agent. Read `.agents/agents/git.agent.md` for your instructions.
->
-> The feature branch `feature/<name>` has passed QA.
-> Stage, commit with conventional format, merge to main, and tag as vX.Y.Z.
-
-## Quick Reference
-
-### Build Commands
-
+### Step 4: Push
+You push manually:
 ```bash
-# Backend
-cd backend && source .venv/bin/activate && python -m pytest -v
-
-# Frontend
-cd frontend && npm run build
+git push
 ```
 
-### Git Hooks
-
-Install the pre-configured hooks:
-
-```bash
-cp scripts/pre-commit .git/hooks/pre-commit
-cp scripts/pre-push .git/hooks/pre-push
-```
-
-### File Locations
+## File & Command Reference
 
 | What | Where |
 |------|-------|
 | Project context | `AGENTS.md` |
-| Agent definitions | `.agents/agents/*.agent.md` |
-| Skills / how-to guides | `.agents/skills/*/SKILL.md` |
+| Backend context | `backend/AGENTS.md` |
+| Frontend context | `frontend/AGENTS.md` |
+| Skills | `.agents/skills/*/SKILL.md` |
 | Feature plans | `.agents/plans/*.md` |
-| QA reports | `.agents/reports/*.md` |
-| Task queue | `.agents/tasks.yml` |
+| QA reports (optional) | `.agents/reports/*.md` |
+| Verification script | `scripts/verify.sh` |
 | Commit format | `.github/git-commit-instructions.md` |
-| Backend guidance | `backend/AGENTS.md` |
-| Frontend guidance | `frontend/AGENTS.md` |
+
+## Standalone QA
+
+You can run QA at any time without the full workflow:
+
+```
+Read .agents/skills/verify/SKILL.md and verify the current state
+```
+
+This runs `scripts/verify.sh --e2e` and reports results.
+
+## Model Recommendations
+
+| Phase | Model | Why |
+|-------|-------|-----|
+| Planning | Opus | Architecture decisions, scope analysis |
+| Implementation | Flash | Bulk coding, well-defined by the plan |
+| Verification | Flash | Mechanical — run scripts, fix errors |

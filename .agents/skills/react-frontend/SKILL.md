@@ -13,6 +13,8 @@ When working on the React frontend in `frontend/src/`.
 - **Icons**: Lucide React
 - **Routing**: React Router DOM v7
 - **Linting**: ESLint 10 with TypeScript and React plugins
+- **Unit Testing**: Vitest with React Testing Library
+- **E2E Testing**: Playwright (Chromium)
 
 ## Commands
 
@@ -30,6 +32,15 @@ npx tsc --noEmit
 
 # Lint
 npm run lint
+
+# Unit tests (Vitest)
+npm run test
+
+# Unit tests in watch mode
+npm run test:watch
+
+# E2E tests (Playwright — requires running servers)
+npm run test:e2e
 
 # Preview production build
 npm run preview
@@ -59,10 +70,49 @@ npm run preview
 - `Dashboard.tsx` — Stats, Recharts AreaChart + PieChart
 - `Transactions.tsx` — Search/filter, transaction list, add trade modal
 - `Holdings.tsx` — Position table with live totals
+- `Insights.tsx` — Portfolio analytics and insights
+
+## Testing Patterns
+
+### Vitest Unit Tests
+- Config: `vitest.config.ts`
+- Setup: `src/test/setup.ts`
+- Pattern: `src/**/*.test.{ts,tsx}`
+- Use `@testing-library/react` for rendering components
+- Use `@testing-library/user-event` for simulating interactions
+- Mock API calls with `vi.mock()` for isolated tests
+
+```typescript
+import { describe, it, expect } from 'vitest'
+import { render, screen } from '@testing-library/react'
+
+describe('MyComponent', () => {
+  it('should render correctly', () => {
+    render(<MyComponent />)
+    expect(screen.getByText('Hello')).toBeInTheDocument()
+  })
+})
+```
+
+### Playwright E2E Tests
+- Config: `e2e/playwright.config.ts`
+- Pattern: `e2e/*.spec.ts`
+- Browser: Chromium only
+- Smoke tests — verify pages load and critical elements exist
+- Add specific tests per feature as part of the develop workflow
+
+```typescript
+import { test, expect } from '@playwright/test'
+
+test('page loads', async ({ page }) => {
+  await page.goto('/my-page')
+  await expect(page.locator('h1')).toBeVisible()
+})
+```
 
 ## Conventions
 - **Tailwind CSS v4**: Use `@import "tailwindcss"` in CSS — no `tailwind.config.js`
 - **TanStack Query**: All server data via query hooks — never `useState` + `useEffect` for fetching
 - **Vite proxy**: `/api` requests proxy to `http://localhost:8000` in dev
 - **Port**: Dev server runs on `5174`
-- **No test runner configured yet** — `npm run build` (tsc + vite) is the primary validation
+- **Node**: Requires Node 22+ (see `.nvmrc`)

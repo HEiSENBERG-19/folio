@@ -11,7 +11,7 @@ backend/
 │   ├── main.py              # FastAPI app, CORS, router registration
 │   ├── config.py            # Settings (API_V1_PREFIX)
 │   ├── database.py          # SQLite engine, get_session dependency
-│   ├── models.py            # SQLModel tables: Account, Asset, Transaction, FIFOLot, LotClosure, PriceCache
+│   ├── models.py            # SQLModel tables: Account, Asset, Transaction, Holding, PriceCache, AssetMetadata
 │   ├── schemas.py           # Pydantic request/response schemas
 │   ├── routers/
 │   │   ├── accounts.py      # CRUD for brokerage accounts
@@ -19,15 +19,18 @@ backend/
 │   │   ├── transactions.py  # BUY/SELL/DEPOSIT/WITHDRAWAL/FEE transactions
 │   │   └── portfolio.py     # Summary, history, allocation endpoints
 │   └── services/
-│       ├── fifo_engine.py   # FIFO lot matching for sell orders
-│       ├── portfolio.py     # Portfolio aggregation and history calculations
-│       └── price_service.py # yfinance price fetching with PriceCache
+│       ├── holdings_service.py    # Weighted average cost calculations for holdings
+│       ├── transaction_service.py # Transaction processing and validation
+│       ├── portfolio.py           # Portfolio aggregation and history calculations
+│       ├── price_service.py       # yfinance price fetching with PriceCache
+│       └── csv_import.py          # CSV trade import parsing
 ├── tests/
-│   ├── conftest.py          # Fixtures: in-memory SQLite session, TestClient
-│   ├── test_api.py          # Integration tests for all API endpoints
-│   ├── test_fifo_engine.py  # Unit tests for FIFO matching logic
-│   ├── test_m1.py           # Milestone 1 validation tests
-│   └── test_portfolio.py    # Portfolio calculation tests
+│   ├── conftest.py              # Fixtures: in-memory SQLite session, TestClient
+│   ├── test_api.py              # Integration tests for all API endpoints
+│   ├── test_holdings_service.py # Unit tests for holdings calculations
+│   ├── test_portfolio.py        # Portfolio calculation tests
+│   ├── test_csv_import.py       # CSV import tests
+│   └── test_m1.py               # Milestone 1 validation tests
 ├── requirements.txt         # Python dependencies
 └── .venv/                   # Virtual environment (not committed)
 ```
@@ -38,7 +41,7 @@ backend/
 - **Lifespan handler**: `create_db_and_tables()` runs on app startup
 - **CORS**: Allows `http://localhost:5174` for Vite dev server
 - **Auto-uppercase**: Asset tickers are normalized to uppercase on creation
-- **FIFO engine**: Sell transactions match against oldest open lots first
+- **Weighted average cost**: Holdings track average cost basis, updated on each buy/sell
 - **Price caching**: yfinance data cached in `PriceCache` table with `(asset_id, price_date)` unique constraint
 
 ## Testing
@@ -49,12 +52,12 @@ cd backend && source .venv/bin/activate
 python -m pytest -v --tb=short
 
 # Run specific test file
-python -m pytest tests/test_fifo_engine.py -v
+python -m pytest tests/test_holdings_service.py -v
 ```
 
 - Tests use in-memory SQLite via `StaticPool` — no file DB needed
 - `TestClient` wraps the FastAPI app with session override
-- ~50 tests covering API endpoints, FIFO logic, and portfolio calculations
+- Run `python -m pytest -v` to see current test count
 
 ## Adding a New Feature
 

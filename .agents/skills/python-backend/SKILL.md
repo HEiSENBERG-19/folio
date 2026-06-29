@@ -56,14 +56,17 @@ ruff format --check app/ tests/
 
 ### Services (`app/services/`)
 - Business logic separated from route handlers
-- `fifo_engine.py` — FIFO lot matching for sell transactions
+- `holdings_service.py` — Weighted average cost calculations for holdings
+- `transaction_service.py` — Transaction processing and validation
 - `portfolio.py` — Portfolio summary, history, allocation calculations
 - `price_service.py` — yfinance price fetching with SQLite cache
+- `csv_import.py` — CSV trade file import and parsing
 
 ### Tests (`tests/`)
 - `conftest.py` provides `session` (in-memory SQLite) and `client` (TestClient) fixtures
 - Tests use `TestClient` from FastAPI, not httpx directly
-- Each test file focuses on one area: `test_api.py`, `test_fifo_engine.py`, `test_portfolio.py`
+- Each test file focuses on one area: `test_api.py`, `test_holdings_service.py`, `test_portfolio.py`
+- Run `python -m pytest -v` to see current test count
 
 ## Conventions
 - **No `datetime.utcnow()`** — always `datetime.now(timezone.utc)`
