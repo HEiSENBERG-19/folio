@@ -1,6 +1,6 @@
 # Folio — Technical Architecture
 
-> A lightweight, single-user stock portfolio tracker with strict FIFO P&L and automated charting via yfinance.
+> A lightweight, single-user stock portfolio tracker with weighted average cost (WAC) P&L and automated charting via yfinance.
 
 ---
 
@@ -12,17 +12,16 @@ All tables live in a single SQLite file (`folio.db`). SQLModel is used for ORM m
 erDiagram
     Account ||--o{ Transaction : has
     Asset ||--o{ Transaction : references
-    Asset ||--o{ FIFOLot : has
-    Account ||--o{ FIFOLot : belongs_to
-    Transaction ||--o{ FIFOLot : opens
-    Transaction ||--o{ LotClosure : triggers
-    FIFOLot ||--o{ LotClosure : partially_or_fully_closes
+    Account ||--o{ Holding : belongs_to
+    Asset ||--o{ Holding : references
     Asset ||--o{ PriceCache : cached_for
+    Asset ||--o| AssetMetadata : has
 
     Account {
         int id PK
-        string name "e.g. 'Zerodha', 'IBKR'"
+        string name "UNIQUE, e.g. 'Zerodha', 'IBKR'"
         float cash_balance "Running cash balance"
+        string currency "Account base currency, e.g. 'INR'"
         datetime created_at
         datetime updated_at
     }
@@ -47,27 +46,15 @@ erDiagram
         datetime created_at "Record creation timestamp"
     }
 
-    FIFOLot {
+    Holding {
         int id PK
         int account_id FK
         int asset_id FK
-        int open_transaction_id FK "The BUY transaction that created this lot"
-        float quantity_purchased "Original quantity bought"
-        float quantity_remaining "Decremented on each SELL"
-        float cost_per_unit "Price paid per share in this lot"
-        datetime opened_at "Date of the BUY"
+        float total_shares "Current number of shares held"
+        float total_cost "Total cost basis of shares held"
+        float realized_pnl "Accumulated realized P&L from sells"
         datetime created_at
-    }
-
-    LotClosure {
-        int id PK
-        int fifo_lot_id FK "Which lot was (partially) closed"
-        int sell_transaction_id FK "The SELL transaction that closed it"
-        float quantity_closed "How many shares consumed from this lot"
-        float cost_per_unit "Cost basis of the lot"
-        float sell_price_per_unit "Sale price"
-        float realized_pnl "( sell_price - cost ) * quantity_closed"
-        datetime closed_at
+        datetime updated_at
     }
 
     PriceCache {
@@ -77,15 +64,35 @@ erDiagram
         float close_price "Adjusted close"
         datetime fetched_at "When we fetched this from yfinance"
     }
+
+    AssetMetadata {
+        int id PK
+        int asset_id FK "UNIQUE"
+        string currency "e.g. 'USD', 'INR'"
+        string asset_class "e.g. 'Equity', 'ETF', 'Mutual Fund', 'Crypto'"
+        string sector "NULLABLE"
+        string industry "NULLABLE"
+        string country "NULLABLE"
+        string exchange "NULLABLE"
+        float beta "NULLABLE"
+        float market_cap "NULLABLE"
+        string long_name "NULLABLE"
+        float fifty_two_week_high "NULLABLE"
+        float fifty_two_week_low "NULLABLE"
+        float trailing_pe "NULLABLE"
+        float dividend_yield "NULLABLE"
+        float price_to_book "NULLABLE"
+        datetime fetched_at
+    }
 ```
 
 ### Table Definitions (SQLModel Python)
 
 ```python
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 from typing import Optional
 from enum import Enum
-from sqlmodel import SQLModel, Field, Relationship
+from sqlmodel import SQLModel, Field, UniqueConstraint
 
 class TxType(str, Enum):
     BUY = "BUY"
@@ -98,14 +105,15 @@ class Account(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str = Field(index=True, unique=True)
     cash_balance: float = Field(default=0.0)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    currency: str = Field(default="INR")
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class Asset(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     ticker: str = Field(index=True, unique=True)
     name: str = Field(default="")
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class Transaction(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -116,44 +124,50 @@ class Transaction(SQLModel, table=True):
     price_per_unit: float = Field(default=0.0)
     total_amount: float = Field(default=0.0)
     notes: str = Field(default="")
-    executed_at: datetime  # user-supplied trade timestamp
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    executed_at: datetime
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
-class FIFOLot(SQLModel, table=True):
+class Holding(SQLModel, table=True):
+    """Tracks current position per (account, asset) using Weighted Average Cost."""
     id: Optional[int] = Field(default=None, primary_key=True)
     account_id: int = Field(foreign_key="account.id")
     asset_id: int = Field(foreign_key="asset.id")
-    open_transaction_id: int = Field(foreign_key="transaction.id")
-    quantity_purchased: float
-    quantity_remaining: float
-    cost_per_unit: float
-    opened_at: datetime
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-
-class LotClosure(SQLModel, table=True):
-    id: Optional[int] = Field(default=None, primary_key=True)
-    fifo_lot_id: int = Field(foreign_key="fifolot.id")
-    sell_transaction_id: int = Field(foreign_key="transaction.id")
-    quantity_closed: float
-    cost_per_unit: float
-    sell_price_per_unit: float
-    realized_pnl: float
-    closed_at: datetime = Field(default_factory=datetime.utcnow)
+    total_shares: float = Field(default=0.0)
+    total_cost: float = Field(default=0.0)
+    realized_pnl: float = Field(default=0.0)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class PriceCache(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     asset_id: int = Field(foreign_key="asset.id")
     price_date: date = Field(index=True)
     close_price: float
-    fetched_at: datetime = Field(default_factory=datetime.utcnow)
+    fetched_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
-    class Config:
-        # Composite uniqueness enforced at app level or via unique constraint
-        pass
+    __table_args__ = (
+        UniqueConstraint("asset_id", "price_date", name="uq_asset_price_date"),
+    )
+
+class AssetMetadata(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    asset_id: int = Field(foreign_key="asset.id", unique=True)
+    currency: str = Field(default="USD")
+    asset_class: str = Field(default="Equity")
+    sector: Optional[str] = Field(default=None)
+    industry: Optional[str] = Field(default=None)
+    country: Optional[str] = Field(default=None)
+    exchange: Optional[str] = Field(default=None)
+    beta: Optional[float] = Field(default=None)
+    market_cap: Optional[float] = Field(default=None)
+    long_name: Optional[str] = Field(default=None)
+    fifty_two_week_high: Optional[float] = Field(default=None)
+    fifty_two_week_low: Optional[float] = Field(default=None)
+    trailing_pe: Optional[float] = Field(default=None)
+    dividend_yield: Optional[float] = Field(default=None)
+    price_to_book: Optional[float] = Field(default=None)
+    fetched_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 ```
-
-> [!NOTE]
-> A `UNIQUE(asset_id, price_date)` constraint should be added to `PriceCache` via a SQLAlchemy `UniqueConstraint` in the `__table_args__`.
 
 ---
 
@@ -166,9 +180,9 @@ Base URL: `http://localhost:8000/api/v1`
 | Method | Path | Description | Request Body | Response |
 |--------|------|-------------|-------------|----------|
 | `GET` | `/accounts` | List all accounts | — | `Account[]` |
-| `POST` | `/accounts` | Create a new account | `{ name: str }` | `Account` |
+| `POST` | `/accounts` | Create a new account | `{ name: str, currency?: str }` | `Account` |
 | `GET` | `/accounts/{id}` | Get account details | — | `Account` |
-| `PUT` | `/accounts/{id}` | Update account name | `{ name: str }` | `Account` |
+| `PUT` | `/accounts/{id}` | Update account name/currency | `{ name: str, currency?: str }` | `Account` |
 | `DELETE` | `/accounts/{id}` | Delete account (fails if transactions exist) | — | `204` |
 
 ### Assets
@@ -185,14 +199,15 @@ Base URL: `http://localhost:8000/api/v1`
 | Method | Path | Description | Request Body | Response |
 |--------|------|-------------|-------------|----------|
 | `GET` | `/transactions` | List transactions (filterable by `account_id`, `asset_id`, `tx_type`, paginated) | Query params | `Transaction[]` |
-| `POST` | `/transactions` | Create a new transaction (triggers FIFO engine) | `TransactionCreate` | `Transaction` |
+| `POST` | `/transactions` | Create a new transaction (triggers holdings calculation) | `TransactionCreate` | `Transaction` |
+| `POST` | `/transactions/import` | Import trades from a CSV file | Form Data (`file`) | `CSVImportResult` |
 | `GET` | `/transactions/{id}` | Get single transaction | — | `Transaction` |
-| `DELETE` | `/transactions/{id}` | Delete transaction (triggers full FIFO recalculation) | — | `204` |
+| `DELETE` | `/transactions/{id}` | Delete transaction (triggers ledger replay and holdings recalculation) | — | `204` |
 
 #### `TransactionCreate` Schema
 
 ```python
-class TransactionCreate(SQLModel):
+class TransactionCreate(BaseModel):
     account_id: int
     asset_id: Optional[int] = None     # Required for BUY/SELL
     tx_type: TxType
@@ -204,7 +219,7 @@ class TransactionCreate(SQLModel):
 ```
 
 > [!IMPORTANT]
-> **On DELETE of a transaction:** Because FIFO ordering is sequential and a deletion mid-stream invalidates all subsequent lot closures, the backend must **wipe all `FIFOLot` and `LotClosure` rows** and **replay all remaining transactions** in `executed_at` order to rebuild consistent state. This is the "ledger replay" strategy described in §3.
+> **On DELETE of a transaction:** Because holdings and cash balances are updated sequentially, deleting a transaction requires a **ledger replay**. The backend will **delete all Holding records** for that account, reset its cash balance to zero, and **replay all remaining transactions** chronologically. This is described in §3.
 
 ### Portfolio (Computed / Read-Only)
 
@@ -213,23 +228,24 @@ class TransactionCreate(SQLModel):
 | `GET` | `/portfolio/summary` | Current holdings, unrealized P&L per ticker, total portfolio value | `PortfolioSummary` |
 | `GET` | `/portfolio/history?period=1Y` | Day-by-day portfolio valuation time-series | `PortfolioHistory` |
 | `GET` | `/portfolio/allocation` | Pie-chart data: current market value per ticker | `AllocationSlice[]` |
+| `GET` | `/portfolio/insights` | In-depth portfolio metadata analytics, cash holdings and totals | `PortfolioInsights` |
 
 #### Response Schemas
 
 ```python
-class HoldingDetail(SQLModel):
+class HoldingDetail(BaseModel):
     ticker: str
     asset_name: str
     total_shares: float
-    avg_cost_basis: float        # Weighted average of remaining FIFO lots
+    avg_cost_basis: float        # Weighted average cost of shares held
     current_price: float         # Latest from yfinance
     market_value: float          # total_shares * current_price
-    unrealized_pnl: float        # market_value - (sum of lot costs)
+    unrealized_pnl: float        # market_value - total_cost
     unrealized_pnl_pct: float    # unrealized_pnl / total_cost * 100
-    realized_pnl: float          # Sum of all LotClosure.realized_pnl for this asset
+    realized_pnl: float          # Accumulated realized P&L from sells
 
-class PortfolioSummary(SQLModel):
-    total_invested: float        # Sum of all BUY total_amounts
+class PortfolioSummary(BaseModel):
+    total_invested: float        # Sum of all holdings' total_cost
     total_market_value: float    # Sum of all holdings' market_value
     total_cash: float            # Sum of all account cash_balances
     total_realized_pnl: float
@@ -237,29 +253,69 @@ class PortfolioSummary(SQLModel):
     net_portfolio_value: float   # total_market_value + total_cash
     holdings: list[HoldingDetail]
 
-class PortfolioHistoryPoint(SQLModel):
+class PortfolioHistoryPoint(BaseModel):
     date: date
     portfolio_value: float       # Sum of (shares_held * close_price) for each ticker
     cash_balance: float          # Running cash at this point
     total_value: float           # portfolio_value + cash_balance
 
-class PortfolioHistory(SQLModel):
+class PortfolioHistory(BaseModel):
     period: str
     data_points: list[PortfolioHistoryPoint]
 
-class AllocationSlice(SQLModel):
+class AllocationSlice(BaseModel):
     ticker: str
     market_value: float
     percentage: float
+
+class HoldingInsightDetail(BaseModel):
+    ticker: str
+    asset_name: str
+    total_shares: float
+    market_value_native: float
+    currency: str
+    asset_class: str
+    sector: Optional[str] = None
+    industry: Optional[str] = None
+    country: Optional[str] = None
+    exchange: Optional[str] = None
+    beta: Optional[float] = None
+    market_cap: Optional[float] = None
+    fifty_two_week_high: Optional[float] = None
+    fifty_two_week_low: Optional[float] = None
+    trailing_pe: Optional[float] = None
+    dividend_yield: Optional[float] = None
+    price_to_book: Optional[float] = None
+    unrealized_pnl_native: float
+
+class CashInsightDetail(BaseModel):
+    account_id: int
+    account_name: str
+    cash_balance_native: float
+    currency: str
+    stock_value_native: float = 0.0
+
+class PortfolioInsights(BaseModel):
+    holdings: list[HoldingInsightDetail]
+    cash_balances: list[CashInsightDetail]
 ```
 
 ---
 
-## 3. FIFO Engine — Service Layer Design
+## 3. Holdings Engine — Service Layer Design
 
 ### 3.1 Core Principle
 
-Every `BUY` creates a **lot** — a discrete record of `N` shares purchased at price `P` on date `D`. Every `SELL` **consumes** lots in strict chronological order (oldest `opened_at` first), partially closing a lot if the sell quantity doesn't exhaust it.
+Position tracking and P&L calculations are handled using the **Weighted Average Cost (WAC)** method.
+- A `BUY` transaction increases the held shares and accumulates the cost basis:
+  $$\text{shares}_{\text{new}} = \text{shares}_{\text{old}} + Q$$
+  $$\text{cost}_{\text{new}} = \text{cost}_{\text{old}} + (Q \times P)$$
+- The average cost basis per share is dynamically computed as:
+  $$\text{avg\_cost} = \frac{\text{total\_cost}}{\text{total\_shares}}$$
+- A `SELL` transaction reduces the shares and cost basis proportionally based on the current average cost, realizing P&L:
+  $$\text{realized\_pnl} = (P_{\text{sell}} - \text{avg\_cost}) \times Q$$
+  $$\text{cost}_{\text{new}} = \text{cost}_{\text{old}} - (\text{avg\_cost} \times Q)$$
+  $$\text{shares}_{\text{new}} = \text{shares}_{\text{old}} - Q$$
 
 ### 3.2 Transaction Processing Pipeline
 
@@ -269,169 +325,121 @@ flowchart TD
     B -->|DEPOSIT| C[Add total_amount to Account.cash_balance]
     B -->|WITHDRAWAL| D[Subtract total_amount from Account.cash_balance]
     B -->|FEE| E[Subtract total_amount from Account.cash_balance]
-    B -->|BUY| F[Create FIFOLot record]
-    F --> G[Subtract total_amount from Account.cash_balance]
-    B -->|SELL| H[Run FIFO Lot Matching]
-    H --> I[Create LotClosure records]
-    I --> J[Add total_amount to Account.cash_balance]
+    B -->|BUY| F[Subtract total_amount from Account.cash_balance]
+    F --> G[Update Holding: Add shares & cost basis]
+    B -->|SELL| H[Add total_amount to Account.cash_balance]
+    H --> I[Update Holding: Deduct shares & cost basis, accumulate realized_pnl]
 ```
 
-### 3.3 FIFO Lot Matching — Detailed Pseudocode
+### 3.3 Holdings Calculation — Python Logic
 
 ```python
-def process_sell(
-    session: Session,
-    tx: Transaction,
-) -> list[LotClosure]:
-    """
-    Consume shares from the oldest open lots for this asset+account.
-    Returns the list of LotClosure records created.
-    """
-    remaining_to_sell = tx.quantity
-    closures: list[LotClosure] = []
+def apply_buy(session: Session, tx: Transaction) -> None:
+    """Apply a BUY transaction: increase total shares and total cost basis."""
+    holding = get_or_create_holding(session, tx.account_id, tx.asset_id)
+    holding.total_shares += tx.quantity
+    holding.total_cost += tx.total_amount
+    holding.updated_at = datetime.now(timezone.utc)
+    session.add(holding)
 
-    # Query open lots: same account, same asset, quantity_remaining > 0
-    # ORDER BY opened_at ASC  <-- THIS IS THE FIFO GUARANTEE
-    open_lots = session.exec(
-        select(FIFOLot)
-        .where(FIFOLot.account_id == tx.account_id)
-        .where(FIFOLot.asset_id == tx.asset_id)
-        .where(FIFOLot.quantity_remaining > 0)
-        .order_by(FIFOLot.opened_at.asc(), FIFOLot.id.asc())
-    ).all()
 
-    for lot in open_lots:
-        if remaining_to_sell <= 0:
-            break
+def apply_sell(session: Session, tx: Transaction) -> None:
+    """Apply a SELL transaction: deduct shares and cost basis, accumulate realized P&L."""
+    holding = get_or_create_holding(session, tx.account_id, tx.asset_id)
 
-        # Determine how much to consume from this lot
-        qty_from_this_lot = min(lot.quantity_remaining, remaining_to_sell)
-
-        # Calculate realized P&L for this slice
-        realized = (tx.price_per_unit - lot.cost_per_unit) * qty_from_this_lot
-
-        # Create the closure record
-        closure = LotClosure(
-            fifo_lot_id=lot.id,
-            sell_transaction_id=tx.id,
-            quantity_closed=qty_from_this_lot,
-            cost_per_unit=lot.cost_per_unit,
-            sell_price_per_unit=tx.price_per_unit,
-            realized_pnl=realized,
-        )
-        closures.append(closure)
-        session.add(closure)
-
-        # Decrement the lot's remaining quantity
-        lot.quantity_remaining -= qty_from_this_lot
-        session.add(lot)
-
-        remaining_to_sell -= qty_from_this_lot
-
-    if remaining_to_sell > 0:
+    if holding.total_shares < tx.quantity:
         raise ValueError(
             f"Insufficient shares to sell. "
             f"Tried to sell {tx.quantity} shares of asset_id={tx.asset_id}, "
-            f"but only {tx.quantity - remaining_to_sell} available in FIFO lots."
+            f"but only {holding.total_shares} available."
         )
 
-    return closures
+    avg_cost = holding.total_cost / holding.total_shares if holding.total_shares > 0 else 0.0
+    realized = (tx.price_per_unit - avg_cost) * tx.quantity
+
+    holding.realized_pnl += realized
+    holding.total_cost -= avg_cost * tx.quantity
+    holding.total_shares -= tx.quantity
+    holding.updated_at = datetime.now(timezone.utc)
+
+    # Clean up floating point representation issues
+    if holding.total_shares < 1e-9:
+        holding.total_shares = 0.0
+        holding.total_cost = 0.0
+
+    session.add(holding)
 ```
 
 ### 3.4 Full Transaction Processor
 
 ```python
 def process_transaction(session: Session, tx: Transaction) -> None:
-    """
-    Central dispatch: routes each transaction type to the correct handler.
-    All balance mutations happen here.
-    """
+    """Process a single transaction with cash balance validation."""
     account = session.get(Account, tx.account_id)
+    if not account:
+        raise ValueError(f"Account with id {tx.account_id} not found.")
 
-    match tx.tx_type:
-        case TxType.DEPOSIT:
-            account.cash_balance += tx.total_amount
-
-        case TxType.WITHDRAWAL:
-            if account.cash_balance < tx.total_amount:
-                raise ValueError("Insufficient cash for withdrawal.")
-            account.cash_balance -= tx.total_amount
-
-        case TxType.FEE:
-            account.cash_balance -= tx.total_amount
-
-        case TxType.BUY:
-            cost = tx.quantity * tx.price_per_unit
-            tx.total_amount = cost  # Ensure consistency
-            if account.cash_balance < cost:
-                raise ValueError("Insufficient cash for purchase.")
-            account.cash_balance -= cost
-
-            lot = FIFOLot(
-                account_id=tx.account_id,
-                asset_id=tx.asset_id,
-                open_transaction_id=tx.id,
-                quantity_purchased=tx.quantity,
-                quantity_remaining=tx.quantity,
-                cost_per_unit=tx.price_per_unit,
-                opened_at=tx.executed_at,
-            )
-            session.add(lot)
-
-        case TxType.SELL:
-            proceeds = tx.quantity * tx.price_per_unit
-            tx.total_amount = proceeds
-            process_sell(session, tx)
-            account.cash_balance += proceeds
-
-    account.updated_at = datetime.utcnow()
+    # 1. Cash balance updates
+    if tx.tx_type == TxType.DEPOSIT:
+        account.cash_balance += tx.total_amount
+    elif tx.tx_type == TxType.WITHDRAWAL:
+        if account.cash_balance < tx.total_amount:
+            raise ValueError("Insufficient cash for withdrawal.")
+        account.cash_balance -= tx.total_amount
+    elif tx.tx_type == TxType.FEE:
+        account.cash_balance -= tx.total_amount
+    elif tx.tx_type == TxType.BUY:
+        if account.cash_balance < tx.total_amount:
+            raise ValueError("Insufficient cash for purchase.")
+        account.cash_balance -= tx.total_amount
+    elif tx.tx_type == TxType.SELL:
+        account.cash_balance += tx.total_amount
     session.add(account)
-    session.commit()
+
+    # 2. Holdings updates
+    if tx.tx_type == TxType.BUY:
+        apply_buy(session, tx)
+    elif tx.tx_type == TxType.SELL:
+        apply_sell(session, tx)
 ```
 
-### 3.5 Ledger Replay (for Transaction Deletion / Edits)
+### 3.5 Ledger Replay (for Transaction Deletion)
 
-When a transaction is deleted, the FIFO chain is broken. The safest and most correct strategy is a **full replay**:
+When a transaction is deleted, the running cash balances and holdings must be rebuilt to ensure mathematical consistency. The backend wipes the computed holdings and replays all transactions chronologically:
 
 ```python
-def replay_ledger(session: Session, account_id: int) -> None:
-    """
-    Wipe all computed state (FIFOLots, LotClosures) for this account
-    and replay all transactions in executed_at order.
-    """
-    # 1. Delete all LotClosures linked to this account's lots
-    lots = session.exec(
-        select(FIFOLot).where(FIFOLot.account_id == account_id)
-    ).all()
-    lot_ids = [l.id for l in lots]
-    if lot_ids:
-        session.exec(
-            delete(LotClosure).where(LotClosure.fifo_lot_id.in_(lot_ids))
-        )
-
-    # 2. Delete all FIFOLots for this account
-    session.exec(
-        delete(FIFOLot).where(FIFOLot.account_id == account_id)
-    )
-
-    # 3. Reset account cash balance to 0
+def replay_account_holdings(session: Session, account_id: int) -> None:
+    """Rebuild holdings and cash balances for a single account from scratch."""
     account = session.get(Account, account_id)
-    account.cash_balance = 0.0
+    if not account:
+        raise ValueError(f"Account with id {account_id} not found.")
 
-    # 4. Fetch all remaining transactions, ordered chronologically
+    # 1. Delete holdings for this account
+    holdings = session.exec(
+        select(Holding).where(Holding.account_id == account_id)
+    ).all()
+    for h in holdings:
+        session.delete(h)
+    session.flush()
+
+    # 2. Reset cash balance
+    account.cash_balance = 0.0
+    session.add(account)
+    session.flush()
+
+    # 3. Replay account transactions in order (without validating negative cash intermediate states)
     transactions = session.exec(
         select(Transaction)
         .where(Transaction.account_id == account_id)
         .order_by(Transaction.executed_at.asc(), Transaction.id.asc())
     ).all()
 
-    # 5. Replay each one through the processor
     for tx in transactions:
-        process_transaction(session, tx)
+        process_transaction_no_cash_check(session, tx)
 ```
 
 > [!WARNING]
-> Replay cost scales linearly with the number of transactions per account. For a single-user personal tracker this is acceptable (hundreds to low-thousands of transactions). If performance becomes a concern, checkpoint-based replay can be added later — but this is explicitly out of scope.
+> Replay cost scales linearly with the number of transactions per account. For a single-user personal tracker this is acceptable (hundreds to low-thousands of transactions).
 
 ---
 
@@ -471,7 +479,7 @@ def build_daily_snapshots(
     Returns a list of daily snapshots:
     [
         {
-            "date": date(2024, 1, 15),
+            "date": date(2026, 1, 15),
             "holdings": {"AAPL": 10, "GOOGL": 5},
             "cash": 5000.0,
         },
@@ -494,21 +502,21 @@ def build_daily_snapshots(
     while current_day <= end_date:
         # Apply any transactions that occurred on this day
         for tx in txns_by_date.get(current_day, []):
-            match tx.tx_type:
-                case TxType.BUY:
-                    ticker = get_ticker(tx.asset_id)  # lookup
+            ticker = get_ticker(tx.asset_id) if tx.asset_id else None
+            if tx.tx_type == TxType.DEPOSIT:
+                current_cash += tx.total_amount
+            elif tx.tx_type == TxType.WITHDRAWAL:
+                current_cash -= tx.total_amount
+            elif tx.tx_type == TxType.FEE:
+                current_cash -= tx.total_amount
+            elif tx.tx_type == TxType.BUY:
+                current_cash -= tx.total_amount
+                if ticker:
                     current_holdings[ticker] += tx.quantity
-                    current_cash -= tx.quantity * tx.price_per_unit
-                case TxType.SELL:
-                    ticker = get_ticker(tx.asset_id)
+            elif tx.tx_type == TxType.SELL:
+                current_cash += tx.total_amount
+                if ticker:
                     current_holdings[ticker] -= tx.quantity
-                    current_cash += tx.quantity * tx.price_per_unit
-                case TxType.DEPOSIT:
-                    current_cash += tx.total_amount
-                case TxType.WITHDRAWAL:
-                    current_cash -= tx.total_amount
-                case TxType.FEE:
-                    current_cash -= tx.total_amount
 
         snapshots.append({
             "date": current_day,
@@ -654,7 +662,7 @@ sequenceDiagram
     FE->>API: POST /api/v1/transactions
     API->>SVC: process_transaction(tx)
     SVC->>DB: INSERT Transaction
-    SVC->>DB: INSERT/UPDATE FIFOLot + LotClosure
+    SVC->>DB: INSERT/UPDATE Holding
     SVC->>DB: UPDATE Account.cash_balance
     SVC-->>API: Transaction created
     API-->>FE: 201 Created
@@ -676,10 +684,10 @@ sequenceDiagram
     Note over FE,YF: Summary / Allocation Flow
     FE->>API: GET /api/v1/portfolio/summary
     API->>SVC: get_portfolio_summary()
-    SVC->>DB: SELECT open FIFOLots (quantity_remaining > 0)
+    SVC->>DB: SELECT Holdings (total_shares > 0)
     SVC->>YF: get_current_prices(tickers)
     SVC->>SVC: Compute unrealized P&L per holding
-    SVC->>DB: SELECT SUM(realized_pnl) from LotClosures
+    SVC->>DB: SELECT realized_pnl from Holdings
     SVC-->>API: PortfolioSummary
     API-->>FE: 200 OK
 ```
@@ -706,37 +714,40 @@ folio/
 │   │   │   └── portfolio.py     # /api/v1/portfolio/*
 │   │   ├── services/
 │   │   │   ├── __init__.py
-│   │   │   ├── fifo_engine.py   # FIFO lot matching & ledger replay
-│   │   │   ├── portfolio.py     # Summary, history, allocation
-│   │   │   └── price_service.py # yfinance fetching & PriceCache
-│   │   └── utils.py             # Helpers
+│   │   │   ├── holdings_service.py    # Weighted Average Cost holdings logic
+│   │   │   ├── transaction_service.py # Transaction processing and ledger replay
+│   │   │   ├── portfolio.py           # Summary, history, allocation, insights
+│   │   │   ├── price_service.py       # yfinance fetching & PriceCache
+│   │   │   └── csv_import.py          # CSV parser and trade history import
 │   ├── tests/
-│   │   ├── test_fifo_engine.py
+│   │   ├── conftest.py
+│   │   ├── test_api.py
+│   │   ├── test_csv_import.py
+│   │   ├── test_holdings_service.py
 │   │   ├── test_portfolio.py
-│   │   └── test_api.py
+│   │   └── test_m1.py
 │   ├── requirements.txt
 │   └── folio.db                 # SQLite file (gitignored)
 ├── frontend/
 │   ├── src/
-│   │   ├── api/                 # Axios/fetch wrappers
-│   │   │   └── client.ts
+│   │   ├── api/                 # Axios client and endpoints
 │   │   ├── components/
 │   │   │   ├── layout/          # Sidebar, Header, Shell
-│   │   │   ├── dashboard/       # Summary cards, charts
-│   │   │   ├── transactions/    # Table, add/edit forms
-│   │   │   └── ui/              # Reusable primitives
-│   │   ├── hooks/
-│   │   │   └── usePortfolio.ts  # TanStack Query hooks
+│   │   │   ├── dashboard/       # Summary cards
+│   │   │   ├── transactions/    # Table, add trade modal, CSV import modal
+│   │   │   ├── ui/              # Reusable primitives
+│   │   │   └── charts/          # AllocationDonutChart
+│   │   ├── hooks/               # TanStack Query custom hooks
 │   │   ├── pages/
 │   │   │   ├── Dashboard.tsx
 │   │   │   ├── Transactions.tsx
-│   │   │   └── Holdings.tsx
-│   │   ├── types/
-│   │   │   └── index.ts         # TypeScript interfaces mirroring backend schemas
+│   │   │   ├── Holdings.tsx
+│   │   │   └── Insights.tsx
+│   │   ├── types/               # TypeScript interfaces mirroring backend schemas
+│   │   ├── context/             # CurrencyContext
 │   │   ├── App.tsx
 │   │   ├── main.tsx
-│   │   └── index.css            # Tailwind directives
-│   ├── tailwind.config.js
+│   │   └── index.css            # Global styles and Tailwind imports
 │   ├── tsconfig.json
 │   ├── vite.config.ts
 │   └── package.json

@@ -33,7 +33,7 @@ When the user approves a plan and asks you to implement it.
 3. If still failing after 3 attempts: **STOP**, report the failures, ask the user for guidance
 4. **Do not proceed past this point unless verify.sh exits 0**
 
-## Phase 3 — Commit & Merge
+## Phase 3 — Commit & Merge & Version
 
 1. `git add -A`
 2. Write a single conventional commit message:
@@ -46,8 +46,15 @@ When the user approves a plan and asks you to implement it.
 4. `git checkout main && git merge --no-ff feature/<plan-name>`
 5. `git branch -d feature/<plan-name>`
 6. Update the plan's YAML: `status: Completed`, update progress checkboxes
-7. **STOP** — tell the user: "Ready to push? Run `git push` when you're ready."
-   - The agent does **NOT** push. The user pushes manually.
+7. **Version Bump & Git Tag:**
+   - Determine the next Semantic Version (`vX.Y.Z`):
+     - Increment the minor version (`Y` in `vX.Y.Z`) if the plan adds new functionality/features (`feat`).
+     - Increment the patch version (`Z` in `vX.Y.Z`) if the changes are only bug fixes (`fix`) or tooling/CI chores (`chore`).
+   - Update `CHANGELOG.md` by inserting a new version section at the top of the file containing the release date and a bulleted list of the changes (grouped by `Added`, `Fixed`, `Removed`, etc.).
+   - Commit the updated `CHANGELOG.md` on the `main` branch with the commit message `docs(build): update CHANGELOG.md for v<version>`.
+   - Create a local git tag for the new version: `git tag v<version>`.
+8. **STOP** — tell the user: "Ready to push? Run `git push && git push --tags` when you're ready."
+   - The agent does **NOT** push. The user pushes code and tags manually.
 
 ## Conventional Commit Reference
 

@@ -1,6 +1,6 @@
 # Folio
 
-A lightweight, single-user stock portfolio tracker with strict FIFO P&L accounting and automated charting via yfinance.
+A lightweight, single-user stock portfolio tracker with weighted average cost (WAC) P&L accounting and automated charting via yfinance.
 
 This codebase is designed to be built and maintained entirely by AI agents under human supervision.
 
