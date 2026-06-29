@@ -141,7 +141,8 @@ export default function Dashboard() {
           ? Array.from({ length: 5 }).map((_, i) => (
               <div
                 key={i}
-                className="relative overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/40 p-5 shadow-sm backdrop-blur-md"
+                data-testid="stat-card"
+                className="relative overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/40 p-5 shadow-sm backdrop-blur-md stat-card"
               >
                 <div className="flex items-center justify-between">
                   <div className="h-4 w-24 bg-slate-800 rounded animate-pulse" />
@@ -157,7 +158,8 @@ export default function Dashboard() {
               return (
                 <div
                   key={stat.label}
-                  className="relative overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/40 p-5 shadow-sm backdrop-blur-md transition-all duration-200 hover:border-slate-700"
+                  data-testid="stat-card"
+                  className="relative overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/40 p-5 shadow-sm backdrop-blur-md transition-all duration-200 hover:border-slate-700 stat-card"
                 >
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">{stat.label}</span>

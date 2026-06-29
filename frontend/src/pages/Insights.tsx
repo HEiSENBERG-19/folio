@@ -189,10 +189,13 @@ export default function Insights() {
     const sec = h.sector || 'Other';
     sectorMap[sec] = (sectorMap[sec] || 0) + h.marketValue;
   });
-  const sectorData = Object.entries(sectorMap).map(([name, value]) => ({
-    name,
-    value,
-    percentage: (value / totalVal) * 100
+  const sectorDataRaw = Object.entries(sectorMap)
+    .map(([name, value]) => ({ name, value }))
+    .filter(item => item.value > 0);
+  const sectorTotal = sectorDataRaw.reduce((sum, item) => sum + item.value, 0);
+  const sectorData = sectorDataRaw.map(item => ({
+    ...item,
+    percentage: sectorTotal > 0 ? (item.value / sectorTotal) * 100 : 0
   })).sort((a, b) => b.value - a.value);
 
   const typeMap: { [key: string]: number } = {};
@@ -202,10 +205,13 @@ export default function Insights() {
   if (cashVal > 0) {
     typeMap['Cash'] = cashVal;
   }
-  const typeData = Object.entries(typeMap).map(([name, value]) => ({
-    name,
-    value,
-    percentage: (value / totalVal) * 100
+  const typeDataRaw = Object.entries(typeMap)
+    .map(([name, value]) => ({ name, value }))
+    .filter(item => item.value > 0);
+  const typeTotal = typeDataRaw.reduce((sum, item) => sum + item.value, 0);
+  const typeData = typeDataRaw.map(item => ({
+    ...item,
+    percentage: typeTotal > 0 ? (item.value / typeTotal) * 100 : 0
   })).sort((a, b) => b.value - a.value);
 
   const countryMap: { [key: string]: number } = {};
@@ -217,10 +223,13 @@ export default function Insights() {
     const country = c.currency === 'INR' ? 'India' : 'United States';
     countryMap[country] = (countryMap[country] || 0) + c.cashBalance;
   });
-  const countryData = Object.entries(countryMap).map(([name, value]) => ({
-    name,
-    value,
-    percentage: (value / totalVal) * 100
+  const countryDataRaw = Object.entries(countryMap)
+    .map(([name, value]) => ({ name, value }))
+    .filter(item => item.value > 0);
+  const countryTotal = countryDataRaw.reduce((sum, item) => sum + item.value, 0);
+  const countryData = countryDataRaw.map(item => ({
+    ...item,
+    percentage: countryTotal > 0 ? (item.value / countryTotal) * 100 : 0
   })).sort((a, b) => b.value - a.value);
 
   const currMap: { [key: string]: number } = {};
@@ -230,20 +239,26 @@ export default function Insights() {
   normalizedCash.forEach(c => {
     currMap[c.currency] = (currMap[c.currency] || 0) + c.cashBalance;
   });
-  const currencyData = Object.entries(currMap).map(([name, value]) => ({
-    name,
-    value,
-    percentage: (value / totalVal) * 100
+  const currencyDataRaw = Object.entries(currMap)
+    .map(([name, value]) => ({ name, value }))
+    .filter(item => item.value > 0);
+  const currencyTotal = currencyDataRaw.reduce((sum, item) => sum + item.value, 0);
+  const currencyData = currencyDataRaw.map(item => ({
+    ...item,
+    percentage: currencyTotal > 0 ? (item.value / currencyTotal) * 100 : 0
   })).sort((a, b) => b.value - a.value);
 
   const accountMap: { [key: string]: number } = {};
   normalizedCash.forEach(c => {
     accountMap[c.account_name] = c.cashBalance + c.stockValue;
   });
-  const accountData = Object.entries(accountMap).map(([name, value]) => ({
-    name,
-    value,
-    percentage: (value / totalVal) * 100
+  const accountDataRaw = Object.entries(accountMap)
+    .map(([name, value]) => ({ name, value }))
+    .filter(item => item.value > 0);
+  const accountTotal = accountDataRaw.reduce((sum, item) => sum + item.value, 0);
+  const accountData = accountDataRaw.map(item => ({
+    ...item,
+    percentage: accountTotal > 0 ? (item.value / accountTotal) * 100 : 0
   })).sort((a, b) => b.value - a.value);
 
   let lowRiskVal = 0;
@@ -255,12 +270,17 @@ export default function Insights() {
     else if (b > 1.2) highRiskVal += h.marketValue;
     else medRiskVal += h.marketValue;
   });
-  const riskData = [
-    { name: 'Cash', value: cashVal, percentage: (cashVal / totalVal) * 100, color: '#64748b' },
-    { name: 'Low Risk (Beta ≤ 0.8)', value: lowRiskVal, percentage: (lowRiskVal / totalVal) * 100, color: '#10b981' },
-    { name: 'Medium Risk (0.8 < Beta ≤ 1.2)', value: medRiskVal, percentage: (medRiskVal / totalVal) * 100, color: '#3b82f6' },
-    { name: 'High Risk (Beta > 1.2)', value: highRiskVal, percentage: (highRiskVal / totalVal) * 100, color: '#ef4444' }
+  const riskItems = [
+    { name: 'Cash', value: cashVal, color: '#64748b' },
+    { name: 'Low Risk (Beta ≤ 0.8)', value: lowRiskVal, color: '#10b981' },
+    { name: 'Medium Risk (0.8 < Beta ≤ 1.2)', value: medRiskVal, color: '#3b82f6' },
+    { name: 'High Risk (Beta > 1.2)', value: highRiskVal, color: '#ef4444' }
   ].filter(r => r.value > 0);
+  const riskTotal = riskItems.reduce((sum, item) => sum + item.value, 0);
+  const riskData = riskItems.map(item => ({
+    ...item,
+    percentage: riskTotal > 0 ? (item.value / riskTotal) * 100 : 0
+  }));
 
   const treemapData = normalizedHoldings.map(h => ({
     name: h.ticker,

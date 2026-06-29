@@ -163,16 +163,13 @@ if [[ "$RUN_E2E" == true ]]; then
 
   # Start backend
   echo "  Starting backend server..."
-  cd backend && source .venv/bin/activate
-  uvicorn app.main:app --port 8000 &
+  (cd backend && source .venv/bin/activate && uvicorn app.main:app --port 8000) &
   BACKEND_PID=$!
-  cd ..
 
   # Start frontend
   echo "  Starting frontend dev server..."
-  cd frontend && npm run dev -- --port 5174 &
+  (cd frontend && npm run dev -- --port 5174) &
   FRONTEND_PID=$!
-  cd ..
 
   # Wait for servers to be ready
   echo "  Waiting for servers..."
